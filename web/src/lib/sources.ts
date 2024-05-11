@@ -171,6 +171,11 @@ const SOURCE_METADATA_MAP: SourceMap = {
     displayName: "Request Tracker",
     category: SourceCategory.AppConnection,
   },
+  paperless: {
+    icon: BookstackIcon,
+    displayName: "Paperless",
+    category: SourceCategory.AppConnection,
+  },
 };
 
 function fillSourceMetadata(

@@ -40,7 +40,8 @@ export type ValidSources =
   | "sharepoint"
   | "zendesk"
   | "discourse"
-  | "axero";
+  | "axero"
+  | "paperless";
 
 export type ValidInputTypes = "load_state" | "poll" | "event";
 export type ValidStatuses =
@@ -105,6 +106,10 @@ export interface GoogleDriveConfig {
 export interface GmailConfig {}
 
 export interface BookstackConfig {}
+
+export interface PaperlessConfig {
+  //TODO
+}
 
 export interface ConfluenceConfig {
   wiki_page_url: string;
@@ -242,6 +247,11 @@ export interface BookstackCredentialJson {
   bookstack_base_url: string;
   bookstack_api_token_id: string;
   bookstack_api_token_secret: string;
+}
+
+export interface PaperlessCredentialJson {
+  paperless_base_url: string;
+  paperless_api_token: string;
 }
 
 export interface ConfluenceCredentialJson {

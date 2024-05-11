@@ -1,0 +1,235 @@
+"use client";
+
+import * as Yup from "yup";
+import { BookstackIcon, TrashIcon } from "@/components/icons/icons";
+import { TextFormField } from "@/components/admin/connectors/Field";
+import { HealthCheckBanner } from "@/components/health/healthcheck";
+import { CredentialForm } from "@/components/admin/connectors/CredentialForm";
+import {
+  PaperlessCredentialJson,
+  PaperlessConfig,
+  ConnectorIndexingStatus,
+  Credential,
+} from "@/lib/types";
+import useSWR, { useSWRConfig } from "swr";
+import { fetcher } from "@/lib/fetcher";
+import { LoadingAnimation } from "@/components/Loading";
+import { adminDeleteCredential, linkCredential } from "@/lib/credential";
+import { ConnectorForm } from "@/components/admin/connectors/ConnectorForm";
+import { ConnectorsTable } from "@/components/admin/connectors/table/ConnectorsTable";
+import { usePopup } from "@/components/admin/connectors/Popup";
+import { usePublicCredentials } from "@/lib/hooks";
+import { AdminPageTitle } from "@/components/admin/Title";
+import { Card, Text, Title } from "@tremor/react";
+
+const Main = () => {
+  const { popup, setPopup } = usePopup();
+
+  const { mutate } = useSWRConfig();
+  const {
+    data: connectorIndexingStatuses,
+    isLoading: isConnectorIndexingStatusesLoading,
+    error: isConnectorIndexingStatusesError,
+  } = useSWR<ConnectorIndexingStatus<any, any>[]>(
+    "/api/manage/admin/connector/indexing-status",
+    fetcher
+  );
+  const {
+    data: credentialsData,
+    isLoading: isCredentialsLoading,
+    error: isCredentialsError,
+    refreshCredentials,
+  } = usePublicCredentials();
+
+  if (
+    (!connectorIndexingStatuses && isConnectorIndexingStatusesLoading) ||
+    (!credentialsData && isCredentialsLoading)
+  ) {
+    return <LoadingAnimation text="Loading" />;
+  }
+
+  if (isConnectorIndexingStatusesError || !connectorIndexingStatuses) {
+    return <div>Failed to load connectors</div>;
+  }
+
+  if (isCredentialsError || !credentialsData) {
+    return <div>Failed to load credentials</div>;
+  }
+
+  const paperlessConnectorIndexingStatuses: ConnectorIndexingStatus<
+    PaperlessConfig,
+    PaperlessCredentialJson
+  >[] = connectorIndexingStatuses.filter(
+    (connectorIndexingStatus) =>
+      connectorIndexingStatus.connector.source === "paperless"
+  );
+  const paperlessCredential: Credential<PaperlessCredentialJson> | undefined =
+    credentialsData.find(
+      (credential) => credential.credential_json?.paperless_api_token
+    );
+
+  return (
+    <>
+      {popup}
+      <Title className="mb-2 mt-6 ml-auto mr-auto">
+        Step 1: Provide your API details
+      </Title>
+
+      {paperlessCredential ? (
+        <>
+          <div className="flex mb-1 text-sm">
+            <Text className="my-auto">Existing API Token: </Text>
+            <Text className="ml-1 italic my-auto max-w-md">
+              {paperlessCredential.credential_json?.paperless_api_token}
+            </Text>
+            <button
+              className="ml-1 hover:bg-hover rounded p-1"
+              onClick={async () => {
+                if (paperlessConnectorIndexingStatuses.length > 0) {
+                  setPopup({
+                    type: "error",
+                    message:
+                      "Must delete all connectors before deleting credentials",
+                  });
+                  return;
+                }
+                await adminDeleteCredential(paperlessCredential.id);
+                refreshCredentials();
+              }}
+            >
+              <TrashIcon />
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <Text>
+            To get started you&apos;ll need API token details for your Paperless
+            instance. You can get these by editing your (or another) user
+            account in Paperless and creating a token via the &apos;API
+            Tokens&apos; section at the bottom. Your user account will require
+            to be assigned a Paperless role which has the &apos;Access system
+            API&apos; system permission assigned.
+          </Text>
+          <Card className="mt-2 mb-4">
+            <CredentialForm<PaperlessCredentialJson>
+              formBody={
+                <>
+                  <TextFormField
+                    name="paperless_base_url"
+                    label="Instance Base URL:"
+                  />
+                  <TextFormField
+                    name="paperless_api_token"
+                    label="API Token:"
+                    type="password"
+                  />
+                </>
+              }
+              validationSchema={Yup.object().shape({
+                paperless_base_url: Yup.string().required(
+                  "Please enter the base URL for your Paperless instance"
+                ),
+                paperless_api_token: Yup.string().required(
+                  "Please enter your Paperless API token"
+                ),
+              })}
+              initialValues={{
+                paperless_base_url: "http://host.docker.internal:8000",
+                paperless_api_token: "",
+              }}
+              onSubmit={(isSuccess) => {
+                if (isSuccess) {
+                  refreshCredentials();
+                  mutate("/api/manage/admin/connector/indexing-status");
+                }
+              }}
+            />
+          </Card>
+        </>
+      )}
+
+      {paperlessConnectorIndexingStatuses.length > 0 && (
+        <>
+          <Title className="mb-2 mt-6 ml-auto mr-auto">
+            Paperless indexing status
+          </Title>
+          <Text className="mb-2">
+            The latest document changes are fetched every
+            10 minutes.
+          </Text>
+          <div className="mb-2">
+            <ConnectorsTable<PaperlessConfig, PaperlessCredentialJson>
+              connectorIndexingStatuses={paperlessConnectorIndexingStatuses}
+              liveCredential={paperlessCredential}
+              getCredential={(credential) => {
+                return (
+                  <div>
+                    <p>{credential.credential_json.paperless_api_token}</p>
+                  </div>
+                );
+              }}
+              onCredentialLink={async (connectorId) => {
+                if (paperlessCredential) {
+                  await linkCredential(connectorId, paperlessCredential.id);
+                  mutate("/api/manage/admin/connector/indexing-status");
+                }
+              }}
+              onUpdate={() =>
+                mutate("/api/manage/admin/connector/indexing-status")
+              }
+            />
+          </div>
+        </>
+      )}
+
+      {paperlessCredential &&
+        paperlessConnectorIndexingStatuses.length === 0 && (
+          <>
+            <Card className="mt-4">
+              <h2 className="font-bold mb-3">Create Connection</h2>
+              <Text className="mb-4">
+                Press connect below to start the connection to your Paperless
+                instance.
+              </Text>
+              <ConnectorForm<PaperlessConfig>
+                nameBuilder={(values) => `PaperlessConnector`}
+                ccPairNameBuilder={(values) => `PaperlessConnector`}
+                source="paperless"
+                inputType="poll"
+                formBody={<></>}
+                validationSchema={Yup.object().shape({})}
+                initialValues={{}}
+                refreshFreq={10 * 60} // 10 minutes
+                credentialId={paperlessCredential.id}
+              />
+            </Card>
+          </>
+        )}
+
+      {!paperlessCredential && (
+        <>
+          <Text className="mb-4">
+            Please provide your API details in Step 1 first! Once done with
+            that, you&apos;ll be able to start the connection then see indexing
+            status.
+          </Text>
+        </>
+      )}
+    </>
+  );
+};
+
+export default function Page() {
+  return (
+    <div className="mx-auto container">
+      <div className="mb-4">
+        <HealthCheckBanner />
+      </div>
+
+      <AdminPageTitle icon={<BookstackIcon size={32} />} title="Paperless" />
+
+      <Main />
+    </div>
+  );
+}

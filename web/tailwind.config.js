@@ -21,7 +21,8 @@ module.exports = {
         "3xl": "1700px",
       },
       fontFamily: {
-        sans: ["var(--font-inter)"],
+        //sans: ["var(--font-inter)"],
+        sans: ['Arial', 'Helvetica', 'sans-serif'],
       },
       width: {
         "message-xs": "450px",
@@ -56,41 +57,41 @@ module.exports = {
         accent: "#6671d0",
         "accent-hover": "#5964c2",
         highlight: {
-          text: "#fef9c3", // yellow-100
+          text: "#FDE047", // 使用更鲜明的黄色，提高可见度
         },
-        error: "#ef4444", // red-500
-        success: "#059669", // emerald-600
-        alert: "#f59e0b", // amber-600
-        user: "#fb7185", // yellow-400
-        ai: "#60a5fa", // blue-400
+        error: "#DC2626", // 更新错误颜色为更深红
+        success: "#10B981", // 更新成功颜色为更鲜明的绿色
+        alert: "#F97316", // 更新警告颜色为更鲜明的橙色
+        user: "#059669", // 绿色
+        ai: "#2563EB", // AI颜色与链接颜色一致化
         // light mode
         tremor: {
           brand: {
-            faint: "#eff6ff", // blue-50
-            muted: "#bfdbfe", // blue-200
-            subtle: "#60a5fa", // blue-400
-            DEFAULT: "#3b82f6", // blue-500
-            emphasis: "#1d4ed8", // blue-700
-            inverted: "#ffffff", // white
+            faint: "#E0F2FE", // 更浅的蓝色，类似blue-50
+            muted: "#93C5FD", // 轻柔的蓝色，类似blue-300
+            subtle: "#60A5FA", // 标准的亮蓝色，保持原有
+            DEFAULT: "#3B82F6", // 标准的蓝色，保持原有
+            emphasis: "#1D4ED8", // 较深的蓝色，保持原有
+            inverted: "#FFFFFF", // 白色，保持原有
           },
           background: {
-            muted: "#f9fafb", // gray-50
-            subtle: "#f3f4f6", // gray-100
-            DEFAULT: "#ffffff", // white
-            emphasis: "#374151", // gray-700
+            muted: "#F8FAFC", // 更浅的灰色，类似gray-50
+            subtle: "#F1F5F9", // 稍深一点的灰色，类似gray-100
+            DEFAULT: "#FFFFFF", // 白色背景，保持原有
+            emphasis: "#1E293B", // 较深的灰色，类似gray-800，以加强对比
           },
           border: {
-            DEFAULT: "#e5e7eb", // gray-200
+            DEFAULT: "#D1D5DB", // 灰色，稍深一点，类似gray-300
           },
           ring: {
-            DEFAULT: "#e5e7eb", // gray-200
+            DEFAULT: "#D1D5DB", // 与边框颜色一致，类似gray-300
           },
           content: {
-            subtle: "#9ca3af", // gray-400
-            DEFAULT: "#4b5563", // gray-600
-            emphasis: "#374151", // gray-700
-            strong: "#111827", // gray-900
-            inverted: "#ffffff", // white
+            subtle: "#6B7280", // 灰色，稍浅一点，类似gray-500
+            DEFAULT: "#4B5563", // 中等灰色，保持原有
+            emphasis: "#374151", // 较深的灰色，保持原有
+            strong: "#111827", // 最深的灰色，保持原有
+            inverted: "#FFFFFF", // 白色，保持原有
           },
         },
         // dark mode
@@ -125,29 +126,24 @@ module.exports = {
         },
       },
       boxShadow: {
-        // light
-        "tremor-input": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-        "tremor-card":
-          "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
-        "tremor-dropdown":
-          "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
-        // dark
-        "dark-tremor-input": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-        "dark-tremor-card":
-          "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
-        "dark-tremor-dropdown":
-          "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+        "tremor-input": "0 1px 3px 0 rgba(0, 0, 0, 0.1)",  // 轻微增加阴影强度，增强输入框的聚焦感
+        "tremor-card": "0 2px 4px -1px rgba(0, 0, 0, 0.1)",  // 统一卡片阴影，使其更柔和且适用于多种背景
+        "tremor-dropdown": "0 2px 8px -2px rgba(0, 0, 0, 0.1)",  // 增加下拉菜单的阴影，以增强浮动效果
+        // 保持暗模式下的阴影与亮模式相同，简化设计
+        "dark-tremor-input": "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+        "dark-tremor-card": "0 2px 4px -1px rgba(0, 0, 0, 0.1)",
+        "dark-tremor-dropdown": "0 2px 8px -2px rgba(0, 0, 0, 0.1)",
       },
       borderRadius: {
-        "tremor-small": "0.375rem",
-        "tremor-default": "0.5rem",
-        "tremor-full": "9999px",
+        "tremor-small": "0.25rem",  // 稍微减少小圆角，使其更细腻
+        "tremor-default": "0.5rem",  // 保持默认圆角，适用于大多数组件
+        "tremor-full": "9999px",  // 全圆角，用于圆形按钮或图标
       },
       fontSize: {
-        "tremor-label": ["0.75rem"],
-        "tremor-default": ["0.875rem", { lineHeight: "1.25rem" }],
-        "tremor-title": ["1.125rem", { lineHeight: "1.75rem" }],
-        "tremor-metric": ["1.875rem", { lineHeight: "2.25rem" }],
+        "tremor-label": ["0.75rem", { lineHeight: "1rem" }],  // 小标签文字，稍微调整行高以适应更紧凑的设计
+        "tremor-default": ["0.875rem", { lineHeight: "1.5rem" }], // 默认文本大小，适当增加行高以提高可读性
+        "tremor-title": ["1.25rem", { lineHeight: "1.75rem" }], // 标题大小，适当增加字体大小，行高保持适中，符合现代设计标准
+        "tremor-metric": ["2rem", { lineHeight: "2.5rem" }], // 大号数据展示，增大字体和行高，使其更显眼
       },
     },
   },

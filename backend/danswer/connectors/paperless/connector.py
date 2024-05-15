@@ -9,6 +9,7 @@ from danswer.connectors.models import BasicExpertInfo, Document, Section, Connec
 
 # Use appropriate base URL and API base URL for Paperless
 PAPERLESS_BASE_URL = "http://host.docker.internal:8000"
+PAPERLESS_DOWNLOAD_URL = "http://localhost:8000"
 PAPERLESS_API_TOKEN = "e34006ee506c19615f79d0472104019ac3f61968"
 
 class PaperlessConnector(LoadConnector, PollConnector):
@@ -66,7 +67,7 @@ class PaperlessConnector(LoadConnector, PollConnector):
 
     def _process_document(self, doc: dict) -> Document:
         doc_id = str(doc['id']) if 'id' in doc else doc['title']
-        doc_link = f"{self.base_url}/api/documents/{doc_id}/download/"
+        doc_link = f"{PAPERLESS_DOWNLOAD_URL}/api/documents/{doc_id}/download/"
 
         # We could potentially extract and use tags, notes, or custom fields if they are relevant.
         tags = [f"Tag ID: {tag}" for tag in doc.get('tags', [])]

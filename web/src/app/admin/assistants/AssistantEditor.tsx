@@ -488,6 +488,7 @@ export function AssistantEditor({
                                   )}
                                 </Italic>
                               )}
+<<<<<<< HEAD
 
                               <>
                                 <TextFormField
@@ -534,6 +535,20 @@ export function AssistantEditor({
                                 />
                               </>
                             </>
+=======
+                            />
+                          ) : (
+                            <Italic className="text-sm">
+                              No Document Sets available.{" "}
+                              {user?.role !== "admin" && (
+                                <>
+                                  If this functionality would be useful, reach
+                                  out to the administrators of Neuxnet for
+                                  assistance.
+                                </>
+                              )}
+                            </Italic>
+>>>>>>> e6aa6db0 (完成本地更改的提交)
                           )}
                         </div>
                       )}

@@ -148,7 +148,6 @@ export const ChatSidebar = ({
                 }
                 className="ml-3 w-full"
               >
-<<<<<<< HEAD
                 <BasicClickable fullWidth>
                   <div className="flex items-center text-sm">
                     <FiPlusSquare className="mr-2" /> New Chat
@@ -172,22 +171,6 @@ export const ChatSidebar = ({
                         });
                       })
                   }
-=======
-                <FiSearch className="my-auto mr-2" />
-                Neuxnet Search
-              </Link>
-              <Link
-                href="/chat"
-                className="flex py-3 px-4 cursor-pointer hover:bg-hover"
-              >
-                <FiMessageSquare className="my-auto mr-2" />
-                Neuxnet Chat
-              </Link>
-              {(!user || user.role === "admin") && (
-                <Link
-                  href="/admin/indexing/status"
-                  className="flex py-3 px-4 cursor-pointer border-t border-border hover:bg-hover"
->>>>>>> e6aa6db0 (完成本地更改的提交)
                 >
                   <div className="flex items-center text-sm h-full">
                     <FiFolderPlus className="mx-1 my-auto" />

@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: "Neuxnet",
+  title: "AnswerME",
   description: "Question answering for your documents",
 };
 

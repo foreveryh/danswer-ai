@@ -11,8 +11,20 @@ ARG DANSWER_VERSION=0.3-dev
 ENV DANSWER_VERSION=${DANSWER_VERSION}
 RUN echo "DANSWER_VERSION: ${DANSWER_VERSION}"
 
+# 定义构建参数
+ARG DEBIAN_MIRROR=http://deb.debian.org
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_TRUSTED_HOST=pypi.org
+ARG HF_ENDPOINT=https://huggingface.co
+
+ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST} \
+    HF_ENDPOINT=${HF_ENDPOINT}
+# 通过环境变量配置 Hugging Face 镜像地址
+RUN mkdir -p /root/.huggingface && echo -e "endpoint=${HF_ENDPOINT}\n" > /root/.huggingface/hub
+
 COPY ./requirements/model_server.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /tmp/requirements.txt
+RUN pip install --no-cache-dir --upgrade -r /tmp/requirements.txt --default-timeout=100
 
 RUN apt-get remove -y --allow-remove-essential perl-base && \
     apt-get autoremove -y

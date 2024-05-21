@@ -5,11 +5,26 @@ LABEL com.danswer.description="This image is for the backend of Danswer. It is M
 free for all to use. You can find it at https://hub.docker.com/r/danswer/danswer-backend. For \
 more details, visit https://github.com/danswer-ai/danswer."
 
+
 # Default DANSWER_VERSION, typically overriden during builds by GitHub Actions.
 ARG DANSWER_VERSION=0.3-dev
 ENV DANSWER_VERSION=${DANSWER_VERSION}
 RUN echo "DANSWER_VERSION: ${DANSWER_VERSION}"
 
+# 定义构建参数
+ARG DEBIAN_MIRROR=http://deb.debian.org
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_TRUSTED_HOST=pypi.org
+ARG HF_ENDPOINT=https://huggingface.co
+
+# 确保 /etc/apt/sources.list 文件存在并替换镜像源
+RUN echo "deb ${DEBIAN_MIRROR}/debian/ bookworm main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb ${DEBIAN_MIRROR}/debian/ bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb ${DEBIAN_MIRROR}/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
+
+ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST} \
+    HF_ENDPOINT=${HF_ENDPOINT}
 # Install system dependencies
 # cmake needed for psycopg (postgres)
 # libpq-dev needed for psycopg (postgres)
@@ -26,10 +41,16 @@ RUN apt-get update && \
 # Install Python dependencies
 # Remove py which is pulled in by retry, py is not needed and is a CVE
 COPY ./requirements/default.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /tmp/requirements.txt && \
-    pip uninstall -y py && \
-    playwright install chromium && playwright install-deps chromium && \
-    ln -s /usr/local/bin/supervisord /usr/bin/supervisord
+# 分步执行每个命令并增加调试信息
+RUN pip install --no-cache-dir --upgrade -r /tmp/requirements.txt --default-timeout=100 || { echo 'pip install failed'; exit 1; }
+RUN pip uninstall -y py || { echo 'pip uninstall failed'; exit 1; }
+RUN playwright install chromium || { echo 'playwright install failed'; exit 1; }
+RUN playwright install-deps chromium || { echo 'playwright install-deps failed'; exit 1; }
+RUN ln -s /usr/local/bin/supervisord /usr/bin/supervisord || { echo 'ln command failed'; exit 1; }
+# RUN pip install --no-cache-dir --upgrade -r /tmp/requirements.txt --default-timeout=100 && \
+#     pip uninstall -y py && \
+#     playwright install chromium && playwright install-deps chromium && \
+#     ln -s /usr/local/bin/supervisord /usr/bin/supervisord
 
 # Cleanup for CVEs and size reduction
 # https://github.com/tornadoweb/tornado/issues/3107

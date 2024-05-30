@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile
       args:
         # 中国区镜像
-        - PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-mirrors.cloud.tencent.com}
-        - PIP_INDEX_URL=${PIP_INDEX_URL:-https://mirrors.cloud.tencent.com/pypi/simple}
+        #- PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-mirrors.cloud.tencent.com}
+        #- PIP_INDEX_URL=${PIP_INDEX_URL:-https://mirrors.cloud.tencent.com/pypi/simple}
         - HF_ENDPOINT=${HF_ENDPOINT:-https://hf-mirror.com}
         - DEBIAN_MIRROR=${DEBIAN_MIRROR:-http://mirrors.cloud.tencent.com}
     command: >
@@ -102,8 +102,8 @@ services:
       context: ../../backend
       dockerfile: Dockerfile
       args:
-        - PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-mirrors.cloud.tencent.com}
-        - PIP_INDEX_URL=${PIP_INDEX_URL:-https://mirrors.cloud.tencent.com/pypi/simple}
+        #- PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-mirrors.cloud.tencent.com}
+        #- PIP_INDEX_URL=${PIP_INDEX_URL:-https://mirrors.cloud.tencent.com/pypi/simple}
         - HF_ENDPOINT=${HF_ENDPOINT:-https://hf-mirror.com}
         - DEBIAN_MIRROR=${DEBIAN_MIRROR:-http://mirrors.cloud.tencent.com}
     command: /usr/bin/supervisord

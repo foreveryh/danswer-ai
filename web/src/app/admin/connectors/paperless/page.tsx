@@ -12,7 +12,7 @@ import {
   Credential,
 } from "@/lib/types";
 import useSWR, { useSWRConfig } from "swr";
-import { fetcher } from "@/lib/fetcher";
+import { errorHandlingFetcher } from "@/lib/fetcher";
 import { LoadingAnimation } from "@/components/Loading";
 import { adminDeleteCredential, linkCredential } from "@/lib/credential";
 import { ConnectorForm } from "@/components/admin/connectors/ConnectorForm";
@@ -32,7 +32,7 @@ const Main = () => {
     error: isConnectorIndexingStatusesError,
   } = useSWR<ConnectorIndexingStatus<any, any>[]>(
     "/api/manage/admin/connector/indexing-status",
-    fetcher
+    errorHandlingFetcher
   );
   const {
     data: credentialsData,

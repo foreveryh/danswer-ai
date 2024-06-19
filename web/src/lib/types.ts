@@ -4,6 +4,12 @@ export interface UserPreferences {
   chosen_assistants: number[] | null;
 }
 
+export enum UserStatus {
+  live = "live",
+  invited = "invited",
+  deactivated = "deactivated",
+}
+
 export interface User {
   id: string;
   email: string;
@@ -12,6 +18,7 @@ export interface User {
   is_verified: string;
   role: "basic" | "admin";
   preferences: UserPreferences;
+  status: UserStatus;
 }
 
 export interface MinimalUserSnapshot {
@@ -43,12 +50,15 @@ export type ValidSources =
   | "google_sites"
   | "loopio"
   | "dropbox"
+  | "salesforce"
   | "sharepoint"
   | "teams"
   | "zendesk"
   | "discourse"
   | "axero"
   | "paperless"
+  | "clickup"
+  | "axero"
   | "wikipedia"
   | "mediawiki";
 
@@ -76,6 +86,7 @@ export interface ConnectorBase<T> {
   source: ValidSources;
   connector_specific_config: T;
   refresh_freq: number | null;
+  prune_freq: number | null;
   disabled: boolean;
 }
 
@@ -127,6 +138,10 @@ export interface ConfluenceConfig {
 export interface JiraConfig {
   jira_project_url: string;
   comment_email_blacklist?: string[];
+}
+
+export interface SalesforceConfig {
+  requested_objects?: string[];
 }
 
 export interface SharepointConfig {
@@ -192,6 +207,12 @@ export interface RequestTrackerConfig {}
 export interface Document360Config {
   workspace: string;
   categories?: string[];
+}
+
+export interface ClickupConfig {
+  connector_type: "list" | "folder" | "space" | "workspace";
+  connector_ids?: string[];
+  retrieve_task_comments: boolean;
 }
 
 export interface GoogleSitesConfig {
@@ -374,6 +395,11 @@ export interface Document360CredentialJson {
   document360_api_token: string;
 }
 
+export interface ClickupCredentialJson {
+  clickup_api_token: string;
+  clickup_team_id: string;
+}
+
 export interface ZendeskCredentialJson {
   zendesk_subdomain: string;
   zendesk_email: string;
@@ -382,6 +408,12 @@ export interface ZendeskCredentialJson {
 
 export interface DropboxCredentialJson {
   dropbox_access_token: string;
+}
+
+export interface SalesforceCredentialJson {
+  sf_username: string;
+  sf_password: string;
+  sf_security_token: string;
 }
 
 export interface SharepointCredentialJson {

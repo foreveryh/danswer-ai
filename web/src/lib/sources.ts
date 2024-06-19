@@ -1,6 +1,7 @@
 import {
   AxeroIcon,
   BookstackIcon,
+  ClickupIcon,
   ConfluenceIcon,
   DiscourseIcon,
   Document360Icon,
@@ -21,6 +22,7 @@ import {
   NotionIcon,
   ProductboardIcon,
   RequestTrackerIcon,
+  SalesforceIcon,
   SharepointIcon,
   TeamsIcon,
   SlabIcon,
@@ -160,6 +162,11 @@ const SOURCE_METADATA_MAP: SourceMap = {
     displayName: "Dropbox",
     category: SourceCategory.AppConnection,
   },
+  salesforce: {
+    icon: SalesforceIcon,
+    displayName: "Salesforce",
+    category: SourceCategory.AppConnection,
+  },
   sharepoint: {
     icon: SharepointIcon,
     displayName: "Sharepoint",
@@ -198,6 +205,11 @@ const SOURCE_METADATA_MAP: SourceMap = {
   paperless: {
     icon: BookstackIcon,
     displayName: "Paperless",
+    category: SourceCategory.AppConnection,
+  },
+  clickup: {
+    icon: ClickupIcon,
+    displayName: "Clickup",
     category: SourceCategory.AppConnection,
   },
 };

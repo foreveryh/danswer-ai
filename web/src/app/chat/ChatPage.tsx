@@ -44,7 +44,6 @@ import { useDocumentSelection } from "./useDocumentSelection";
 import { useFilters, useLlmOverride } from "@/lib/hooks";
 import { computeAvailableFilters } from "@/lib/filters";
 import { FeedbackType } from "./types";
-import ResizableSection from "@/components/resizable/ResizableSection";
 import { DocumentSidebar } from "./documentSidebar/DocumentSidebar";
 import { DanswerInitializingLoader } from "@/components/DanswerInitializingLoader";
 import { FeedbackModal } from "./modal/FeedbackModal";
@@ -66,6 +65,15 @@ import { useChatContext } from "@/components/context/ChatContext";
 import { UserDropdown } from "@/components/UserDropdown";
 import { v4 as uuidv4 } from "uuid";
 import { orderAssistantsForUser } from "@/lib/assistants/orderAssistants";
+
+import { TbLayoutSidebarRightExpand } from "react-icons/tb";
+
+import {
+  HEADER_HEIGHT,
+  SIDEBAR_WIDTH,
+  SIDEBAR_WIDTH_CONST,
+  SUB_HEADER,
+} from "@/lib/constants";
 
 const MAX_INPUT_HEIGHT = 200;
 const TEMP_USER_MESSAGE_ID = -1;
@@ -450,6 +458,7 @@ export function ChatPage({
       }
     }
   };
+
   useEffect(() => {
     adjustDocumentSidebarWidth(); // Adjust the width on initial render
     window.addEventListener("resize", adjustDocumentSidebarWidth); // Add resize event listener
@@ -842,12 +851,23 @@ export function ChatPage({
     router.push("/search");
   }
 
+  const [showDocSidebar, setShowDocSidebar] = useState(true); // State to track if sidebar is open
+
+  const toggleSidebar = () => {
+    if (sidebarElementRef.current) {
+      sidebarElementRef.current.style.width = showDocSidebar
+        ? "0px"
+        : SIDEBAR_WIDTH_CONST;
+    }
+
+    setShowDocSidebar((showDocSidebar) => !showDocSidebar); // Toggle the state which will in turn toggle the class
+  };
+
   const retrievalDisabled = !personaIncludesRetrieval(livePersona);
+  const sidebarElementRef = useRef<HTMLDivElement>(null);
+
   return (
     <>
-      {/* <div className="absolute top-0 z-40 w-full">
-        <Header user={user} />
-      </div> */}
       <HealthCheckBanner />
       <InstantSSRAutoRefresh />
 
@@ -859,7 +879,10 @@ export function ChatPage({
           openedFolders={openedFolders}
         />
 
-        <div className="flex w-full overflow-x-hidden" ref={masterFlexboxRef}>
+        <div
+          className=" flex w-full   overflow-x-hidden"
+          ref={masterFlexboxRef}
+        >
           {popup}
           {currentFeedback && (
             <FeedbackModal
@@ -911,7 +934,9 @@ export function ChatPage({
                   <div
                     className={`w-full sm:relative h-screen ${
                       retrievalDisabled ? "pb-[111px]" : "pb-[140px]"
-                    }`}
+                    }
+                      flex-initial transition-margin duration-300 
+                      `}
                     {...getRootProps()}
                   >
                     {/* <input {...getInputProps()} /> */}
@@ -920,9 +945,13 @@ export function ChatPage({
                       ref={scrollableDivRef}
                     >
                       {livePersona && (
-                        <div className="sticky top-0 left-80 z-10 w-full bg-background flex">
-                          <div className="mt-2 flex w-full">
-                            <div className="ml-2 p-1 rounded w-fit">
+                        <div
+                          className={`sticky top-0 left-0 z-10 w-full bg-background flex ${HEADER_HEIGHT}`}
+                        >
+                          <div
+                            className={`${SUB_HEADER}   items-end flex w-full`}
+                          >
+                            <div className="ml-2 px-1  rounded w-fit">
                               <ChatPersonaSelector
                                 personas={filteredAssistants}
                                 selectedPersonaId={livePersona.id}
@@ -931,15 +960,15 @@ export function ChatPage({
                               />
                             </div>
 
-                            <div className="ml-auto mr-8 flex">
+                            <div className="ml-auto mr-3 mt-auto flex items-end">
                               {chatSessionId !== null && (
                                 <div
                                   onClick={() => setSharingModalVisible(true)}
                                   className={`
-                                    my-auto
-                                    p-2
                                     rounded
                                     cursor-pointer
+                                    px-2 
+                                    py-1
                                     hover:bg-hover-light
                                   `}
                                 >
@@ -947,8 +976,17 @@ export function ChatPage({
                                 </div>
                               )}
 
-                              <div className="ml-4 my-auto">
+                              <div className=" flex  ml-4">
                                 <UserDropdown user={user} />
+
+                                {!retrievalDisabled && !showDocSidebar && (
+                                  <button
+                                    className="ml-4 mt-auto"
+                                    onClick={() => toggleSidebar()}
+                                  >
+                                    <TbLayoutSidebarRightExpand size={24} />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1015,7 +1053,6 @@ export function ChatPage({
                                       newCompleteMessageMap
                                     );
                                     setSelectedMessageForDocDisplay(messageId);
-
                                     // set message as latest so we can edit this message
                                     // and so it sticks around on page reload
                                     setMessageAsLatest(messageId);
@@ -1044,7 +1081,7 @@ export function ChatPage({
                                 citedDocuments={getCitedDocumentsFromMessage(
                                   message
                                 )}
-                                toolCall={message.toolCalls[0]}
+                                toolCall={message?.toolCalls?.[0]}
                                 isComplete={
                                   i !== messageHistory.length - 1 ||
                                   !isStreaming
@@ -1240,12 +1277,12 @@ export function ChatPage({
                   </div>
 
                   {!retrievalDisabled ? (
-                    <ResizableSection
-                      intialWidth={documentSidebarInitialWidth as number}
-                      minWidth={400}
-                      maxWidth={maxDocumentSidebarWidth || undefined}
+                    <div
+                      ref={sidebarElementRef}
+                      className={`relative   overflow-y-hidden sidebar bg-background-weak hidden lg:block  ${SIDEBAR_WIDTH} h-screen  `}
                     >
                       <DocumentSidebar
+                        closeSidebar={() => toggleSidebar()}
                         selectedMessage={aiMessage}
                         selectedDocuments={selectedDocuments}
                         toggleDocumentSelection={toggleDocumentSelection}
@@ -1254,10 +1291,11 @@ export function ChatPage({
                         maxTokens={maxTokens}
                         isLoading={isFetchingChatMessages}
                       />
-                    </ResizableSection>
+                    </div>
                   ) : // Another option is to use a div with the width set to the initial width, so that the
                   // chat section appears in the same place as before
                   // <div style={documentSidebarInitialWidth ? {width: documentSidebarInitialWidth} : {}}></div>
+                  // chat section appears in the same place as before
                   null}
                 </>
               )}

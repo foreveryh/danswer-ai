@@ -48,3 +48,7 @@
 .preserve-lines {
   white-space: pre-wrap; /* Preserves whitespace and wraps text */
 }
+
+.sidebar {
+  transition: width 0.2s;
+}

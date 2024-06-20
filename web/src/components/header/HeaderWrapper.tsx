@@ -1,3 +1,7 @@
+// import { HEADER_HEIGHT } from "@/lib/constants";
+
+import { HEADER_HEIGHT } from "@/lib/constants";
+
 export function HeaderWrapper({
   children,
 }: {
@@ -5,7 +9,7 @@ export function HeaderWrapper({
 }) {
   return (
     <header className="border-b border-border bg-background-emphasis">
-      <div className="mx-8 h-16">{children}</div>
+      <div className={`mx-8 ${HEADER_HEIGHT}`}>{children}</div>
     </header>
   );
 }

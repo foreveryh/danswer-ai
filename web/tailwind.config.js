@@ -45,6 +45,7 @@ module.exports = {
         "background-search": "#ffffff",
         "background-custom-header": "#f3f4f6",
         "background-inverted": "#000000",
+        "background-weak": "#f3f4f6", // gray-100
 
         // text or icons
         link: "#3b82f6", // blue-500
@@ -62,6 +63,7 @@ module.exports = {
         // borders
         border: "#e5e7eb", // gray-200
         "border-light": "#f3f4f6", // gray-100
+        "border-medium": "#d1d5db", // gray-300
         "border-strong": "#9ca3af", // gray-400
 
         // hover
@@ -88,7 +90,8 @@ module.exports = {
         },
 
         // bubbles in chat for each "user"
-        user: "#fb7185", // yellow-400
+        user: "#fb7185", // rose-400
+        "user-hover": "#f43f5e", // rose-500
         ai: "#60a5fa", // blue-400
 
         // for display documents

@@ -71,7 +71,7 @@ export const ChatSidebar = ({
         transition-transform`}
         id="chat-sidebar"
       >
-        <div className={`pt-4  ${HEADER_HEIGHT} flex`}>
+        <div className="pt-6 flex">
           <Link
             className="ml-4 w-full"
             href={

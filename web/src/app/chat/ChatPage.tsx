@@ -78,15 +78,6 @@ import { SIDEBAR_WIDTH_CONST } from "@/lib/constants";
 
 import ResizableSection from "@/components/resizable/ResizableSection";
 
-import { TbLayoutSidebarRightExpand } from "react-icons/tb";
-
-import {
-  HEADER_HEIGHT,
-  SIDEBAR_WIDTH,
-  SIDEBAR_WIDTH_CONST,
-  SUB_HEADER,
-} from "@/lib/constants";
-
 const MAX_INPUT_HEIGHT = 200;
 const TEMP_USER_MESSAGE_ID = -1;
 const TEMP_ASSISTANT_MESSAGE_ID = -2;
@@ -977,7 +968,7 @@ export function ChatPage({
               {({ getRootProps }) => (
                 <>
                   <div
-                    className={`w-full  sm:relative h-screen ${
+                    className={`w-full sm:relative h-screen ${
                       retrievalDisabled ? "pb-[111px]" : "pb-[140px]"
                     }
                       flex-auto transition-margin duration-300 
@@ -987,7 +978,7 @@ export function ChatPage({
                   >
                     {/* <input {...getInputProps()} /> */}
                     <div
-                      className={`w-full h-full flex  flex-col overflow-y-auto overflow-x-hidden relative`}
+                      className={`w-full h-full flex flex-col overflow-y-auto overflow-x-hidden relative`}
                       ref={scrollableDivRef}
                     >
                       {/* ChatBanner is a custom banner that displays a admin-specified message at 
@@ -995,13 +986,9 @@ export function ChatPage({
                       <ChatBanner />
 
                       {livePersona && (
-                        <div
-                          className={`sticky top-0 left-0 z-10 w-full bg-background flex ${HEADER_HEIGHT}`}
-                        >
-                          <div
-                            className={`${SUB_HEADER}   items-end flex w-full`}
-                          >
-                            <div className="ml-2 px-1  rounded w-fit">
+                        <div className="sticky top-0 left-80 z-10 w-full bg-background flex">
+                          <div className="mt-2 flex w-full">
+                            <div className="ml-2 p-1 rounded w-fit">
                               <ChatPersonaSelector
                                 personas={filteredAssistants}
                                 selectedPersonaId={livePersona.id}
@@ -1015,10 +1002,10 @@ export function ChatPage({
                                 <div
                                   onClick={() => setSharingModalVisible(true)}
                                   className={`
+                                    my-auto
+                                    p-2
                                     rounded
                                     cursor-pointer
-                                    px-2 
-                                    py-1
                                     hover:bg-hover-light
                                   `}
                                 >
@@ -1353,7 +1340,6 @@ export function ChatPage({
                   ) : // Another option is to use a div with the width set to the initial width, so that the
                   // chat section appears in the same place as before
                   // <div style={documentSidebarInitialWidth ? {width: documentSidebarInitialWidth} : {}}></div>
-                  // chat section appears in the same place as before
                   null}
                 </>
               )}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { EventHandler, useEffect, useRef } from "react";
 import { FiSend, FiFilter, FiPlusCircle, FiCpu } from "react-icons/fi";
 import ChatInputOption from "./ChatInputOption";
 import { FaBrain } from "react-icons/fa";
@@ -55,6 +55,23 @@ export function ChatInputBar({
     }
   }, [message]);
 
+  const handlePaste = (event: React.ClipboardEvent) => {
+    const items = event.clipboardData?.items;
+    if (items) {
+      const pastedFiles = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === "file") {
+          const file = items[i].getAsFile();
+          if (file) pastedFiles.push(file);
+        }
+      }
+      if (pastedFiles.length > 0) {
+        event.preventDefault();
+        handleFileUpload(pastedFiles);
+      }
+    }
+  };
+
   const { llmProviders } = useChatContext();
   const [_, llmName] = getFinalLLM(llmProviders, selectedAssistant, null);
 
@@ -85,7 +102,6 @@ export function ChatInputBar({
               flex-col
               border
               border-border-medium
-
               rounded-lg
               overflow-hidden
               bg-background-weak
@@ -113,6 +129,7 @@ export function ChatInputBar({
               </div>
             )}
             <textarea
+              onPaste={handlePaste}
               ref={textAreaRef}
               className={`
                 m-0
@@ -120,7 +137,6 @@ export function ChatInputBar({
                 shrink
                 resize-none
                 border-0
-             
                 bg-background-weak
                 ${
                   textAreaRef.current &&
@@ -128,7 +144,6 @@ export function ChatInputBar({
                     ? "overflow-y-auto mt-2"
                     : ""
                 }
-                
                 overflow-hidden
                 whitespace-normal
                 break-word

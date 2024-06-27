@@ -71,6 +71,12 @@ import { useChatContext } from "@/components/context/ChatContext";
 import { UserDropdown } from "@/components/UserDropdown";
 import { v4 as uuidv4 } from "uuid";
 import { orderAssistantsForUser } from "@/lib/assistants/orderAssistants";
+import { ChatPopup } from "./ChatPopup";
+import { ChatBanner } from "./ChatBanner";
+import { TbLayoutSidebarRightExpand } from "react-icons/tb";
+import { SIDEBAR_WIDTH_CONST } from "@/lib/constants";
+
+import ResizableSection from "@/components/resizable/ResizableSection";
 
 import { TbLayoutSidebarRightExpand } from "react-icons/tb";
 
@@ -261,6 +267,19 @@ export function ChatPage({
 
     initialSessionFetch();
   }, [existingChatSessionId]);
+
+  const [usedSidebarWidth, setUsedSidebarWidth] = useState<number>(
+    documentSidebarInitialWidth || parseInt(SIDEBAR_WIDTH_CONST)
+  );
+
+  const updateSidebarWidth = (newWidth: number) => {
+    setUsedSidebarWidth(newWidth);
+    if (sidebarElementRef.current && innerSidebarElementRef.current) {
+      sidebarElementRef.current.style.transition = "";
+      sidebarElementRef.current.style.width = `${newWidth}px`;
+      innerSidebarElementRef.current.style.width = `${newWidth}px`;
+    }
+  };
 
   const [chatSessionId, setChatSessionId] = useState<number | null>(
     existingChatSessionId
@@ -876,9 +895,11 @@ export function ChatPage({
 
   const toggleSidebar = () => {
     if (sidebarElementRef.current) {
+      sidebarElementRef.current.style.transition = "width 0.3s ease-in-out";
+
       sidebarElementRef.current.style.width = showDocSidebar
         ? "0px"
-        : SIDEBAR_WIDTH_CONST;
+        : `${usedSidebarWidth}px`;
     }
 
     setShowDocSidebar((showDocSidebar) => !showDocSidebar); // Toggle the state which will in turn toggle the class
@@ -886,11 +907,16 @@ export function ChatPage({
 
   const retrievalDisabled = !personaIncludesRetrieval(livePersona);
   const sidebarElementRef = useRef<HTMLDivElement>(null);
+  const innerSidebarElementRef = useRef<HTMLDivElement>(null);
 
   return (
     <>
       <HealthCheckBanner />
       <InstantSSRAutoRefresh />
+
+      {/* ChatPopup is a custom popup that displays a admin-specified message on initial user visit. 
+      Only used in the EE version of the app. */}
+      <ChatPopup />
 
       <div className="flex relative bg-background text-default overflow-x-hidden">
         <ChatSidebar
@@ -900,10 +926,7 @@ export function ChatPage({
           openedFolders={openedFolders}
         />
 
-        <div
-          className=" flex w-full   overflow-x-hidden"
-          ref={masterFlexboxRef}
-        >
+        <div ref={masterFlexboxRef} className="flex w-full overflow-x-hidden">
           {popup}
           {currentFeedback && (
             <FeedbackModal
@@ -957,7 +980,8 @@ export function ChatPage({
                     className={`w-full  sm:relative h-screen ${
                       retrievalDisabled ? "pb-[111px]" : "pb-[140px]"
                     }
-                      flex-1 transition-margin duration-300 
+                      flex-auto transition-margin duration-300 
+                      overflow-x-auto
                       `}
                     {...getRootProps()}
                   >
@@ -966,6 +990,10 @@ export function ChatPage({
                       className={`w-full h-full flex  flex-col overflow-y-auto overflow-x-hidden relative`}
                       ref={scrollableDivRef}
                     >
+                      {/* ChatBanner is a custom banner that displays a admin-specified message at 
+                      the top of the chat page. Only used in the EE version of the app. */}
+                      <ChatBanner />
+
                       {livePersona && (
                         <div
                           className={`sticky top-0 left-0 z-10 w-full bg-background flex ${HEADER_HEIGHT}`}
@@ -982,7 +1010,7 @@ export function ChatPage({
                               />
                             </div>
 
-                            <div className="ml-auto mr-3 mt-auto flex items-end">
+                            <div className="ml-auto mr-6 flex">
                               {chatSessionId !== null && (
                                 <div
                                   onClick={() => setSharingModalVisible(true)}
@@ -998,9 +1026,8 @@ export function ChatPage({
                                 </div>
                               )}
 
-                              <div className=" flex  ml-4">
+                              <div className="ml-4 flex my-auto">
                                 <UserDropdown user={user} />
-
                                 {!retrievalDisabled && !showDocSidebar && (
                                   <button
                                     className="ml-4 mt-auto"
@@ -1103,9 +1130,7 @@ export function ChatPage({
                                 citedDocuments={getCitedDocumentsFromMessage(
                                   message
                                 )}
-                                toolCall={
-                                  message.toolCalls && message.toolCalls[0]
-                                }
+                                toolCall={message?.toolCalls?.[0]}
                                 isComplete={
                                   i !== messageHistory.length - 1 ||
                                   !isStreaming
@@ -1302,18 +1327,28 @@ export function ChatPage({
                   {!retrievalDisabled ? (
                     <div
                       ref={sidebarElementRef}
-                      className={`relative flex  overflow-y-hidden sidebar bg-background-weak hidden lg:block  ${SIDEBAR_WIDTH} h-screen  `}
+                      className={`relative flex-none  overflow-y-hidden sidebar bg-background-weak h-screen`}
+                      style={{ width: showDocSidebar ? usedSidebarWidth : 0 }}
                     >
-                      <DocumentSidebar
-                        closeSidebar={() => toggleSidebar()}
-                        selectedMessage={aiMessage}
-                        selectedDocuments={selectedDocuments}
-                        toggleDocumentSelection={toggleDocumentSelection}
-                        clearSelectedDocuments={clearSelectedDocuments}
-                        selectedDocumentTokens={selectedDocumentTokens}
-                        maxTokens={maxTokens}
-                        isLoading={isFetchingChatMessages}
-                      />
+                      <ResizableSection
+                        updateSidebarWidth={updateSidebarWidth}
+                        intialWidth={usedSidebarWidth}
+                        minWidth={300}
+                        maxWidth={maxDocumentSidebarWidth || undefined}
+                      >
+                        <DocumentSidebar
+                          initialWidth={showDocSidebar ? usedSidebarWidth : 0}
+                          ref={innerSidebarElementRef}
+                          closeSidebar={() => toggleSidebar()}
+                          selectedMessage={aiMessage}
+                          selectedDocuments={selectedDocuments}
+                          toggleDocumentSelection={toggleDocumentSelection}
+                          clearSelectedDocuments={clearSelectedDocuments}
+                          selectedDocumentTokens={selectedDocumentTokens}
+                          maxTokens={maxTokens}
+                          isLoading={isFetchingChatMessages}
+                        />
+                      </ResizableSection>
                     </div>
                   ) : // Another option is to use a div with the width set to the initial width, so that the
                   // chat section appears in the same place as before

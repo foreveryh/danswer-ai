@@ -46,12 +46,13 @@ DISABLE_AUTH = AUTH_TYPE == AuthType.DISABLED
 # Encryption key secret is used to encrypt connector credentials, api keys, and other sensitive
 # information. This provides an extra layer of security on top of Postgres access controls
 # and is available in Danswer EE
-ENCRYPTION_KEY_SECRET = os.environ.get("ENCRYPTION_KEY_SECRET")
+ENCRYPTION_KEY_SECRET = os.environ.get("ENCRYPTION_KEY_SECRET") or ""
 
 # Turn off mask if admin users should see full credentials for data connectors.
 MASK_CREDENTIAL_PREFIX = (
     os.environ.get("MASK_CREDENTIAL_PREFIX", "True").lower() != "false"
 )
+
 
 SESSION_EXPIRE_TIME_SECONDS = int(
     os.environ.get("SESSION_EXPIRE_TIME_SECONDS") or 86400 * 7
@@ -184,6 +185,12 @@ CONFLUENCE_CONNECTOR_INDEX_ONLY_ACTIVE_PAGES = (
     os.environ.get("CONFLUENCE_CONNECTOR_INDEX_ONLY_ACTIVE_PAGES", "").lower() == "true"
 )
 
+# Save pages labels as Danswer metadata tags
+# The reason to skip this would be to reduce the number of calls to Confluence due to rate limit concerns
+CONFLUENCE_CONNECTOR_SKIP_LABEL_INDEXING = (
+    os.environ.get("CONFLUENCE_CONNECTOR_SKIP_LABEL_INDEXING", "").lower() == "true"
+)
+
 JIRA_CONNECTOR_LABELS_TO_SKIP = [
     ignored_tag
     for ignored_tag in os.environ.get("JIRA_CONNECTOR_LABELS_TO_SKIP", "").split(",")
@@ -271,4 +278,16 @@ TOKEN_BUDGET_GLOBALLY_ENABLED = (
 # Format: list of strings
 CUSTOM_ANSWER_VALIDITY_CONDITIONS = json.loads(
     os.environ.get("CUSTOM_ANSWER_VALIDITY_CONDITIONS", "[]")
+)
+
+
+#####
+# Enterprise Edition Configs
+#####
+# NOTE: this should only be enabled if you have purchased an enterprise license.
+# if you're interested in an enterprise license, please reach out to us at
+# founders@danswer.ai OR message Chris Weaver or Yuhong Sun in the Danswer
+# Slack community (https://join.slack.com/t/danswer/shared_invite/zt-1w76msxmd-HJHLe3KNFIAIzk_0dSOKaQ)
+ENTERPRISE_EDITION_ENABLED = (
+    os.environ.get("ENABLE_PAID_ENTERPRISE_EDITION_FEATURES", "").lower() == "true"
 )

@@ -286,6 +286,9 @@ export const AIMessage = ({
                       code: (props) => (
                         <CodeBlock {...props} content={content as string} />
                       ),
+                      p: ({ node, ...props }) => (
+                        <p {...props} className="text-default" />
+                      ),
                     }}
                     remarkPlugins={[remarkGfm]}
                     rehypePlugins={[[rehypePrism, { ignoreMissing: true }]]}
@@ -511,6 +514,7 @@ export const HumanMessage = ({
                           setEditedContent(content);
                           setIsEditing(false);
                         }
+                        // Submit edit if "Command Enter" is pressed, like in ChatGPT
                         if (e.key === "Enter" && e.metaKey) {
                           handleEditSubmit();
                         }

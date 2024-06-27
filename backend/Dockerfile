@@ -53,18 +53,6 @@ RUN apt-get update && \
 # Install Python dependencies
 # Remove py which is pulled in by retry, py is not needed and is a CVE
 COPY ./requirements/default.txt /tmp/requirements.txt
-<<<<<<< HEAD
-# 分步执行每个命令并增加调试信息
-RUN pip install --no-cache-dir --upgrade -r /tmp/requirements.txt --default-timeout=100 || { echo 'pip install failed'; exit 1; }
-RUN pip uninstall -y py || { echo 'pip uninstall failed'; exit 1; }
-RUN playwright install chromium || { echo 'playwright install failed'; exit 1; }
-RUN playwright install-deps chromium || { echo 'playwright install-deps failed'; exit 1; }
-RUN ln -s /usr/local/bin/supervisord /usr/bin/supervisord || { echo 'ln command failed'; exit 1; }
-# RUN pip install --no-cache-dir --upgrade -r /tmp/requirements.txt --default-timeout=100 && \
-#     pip uninstall -y py && \
-#     playwright install chromium && playwright install-deps chromium && \
-#     ln -s /usr/local/bin/supervisord /usr/bin/supervisord
-=======
 COPY ./requirements/ee.txt /tmp/ee-requirements.txt
 RUN pip install --no-cache-dir --upgrade \
         -r /tmp/requirements.txt \
@@ -73,7 +61,6 @@ RUN pip install --no-cache-dir --upgrade \
     playwright install chromium && \
     playwright install-deps chromium && \
     ln -s /usr/local/bin/supervisord /usr/bin/supervisord
->>>>>>> upstream/main
 
 # Cleanup for CVEs and size reduction
 # https://github.com/tornadoweb/tornado/issues/3107

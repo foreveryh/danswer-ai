@@ -114,16 +114,12 @@ services:
     build:
       context: ../../backend
       dockerfile: Dockerfile
-<<<<<<< HEAD
       args:
         #- PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-mirrors.cloud.tencent.com}
         #- PIP_INDEX_URL=${PIP_INDEX_URL:-https://mirrors.cloud.tencent.com/pypi/simple}
         - HF_ENDPOINT=${HF_ENDPOINT:-https://hf-mirror.com}
         - DEBIAN_MIRROR=${DEBIAN_MIRROR:-http://mirrors.cloud.tencent.com}
-    command: /usr/bin/supervisord
-=======
     command: /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
->>>>>>> upstream/main
     depends_on:
       - relational_db
       - index

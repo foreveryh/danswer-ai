@@ -27,7 +27,6 @@ export async function submitConnector<T>(
 ): Promise<{ message: string; isSuccess: boolean; response?: Connector<T> }> {
   const isUpdate = connectorId !== undefined;
 
-  let isSuccess = false;
   try {
     const response = await fetch(
       BASE_CONNECTOR_URL + (isUpdate ? `/${connectorId}` : ""),
@@ -41,7 +40,6 @@ export async function submitConnector<T>(
     );
 
     if (response.ok) {
-      isSuccess = true;
       const responseJson = await response.json();
       return { message: "Success!", isSuccess: true, response: responseJson };
     } else {
@@ -68,6 +66,7 @@ interface BaseProps<T extends Yup.AnyObject> {
   formBody?: JSX.Element | null;
   formBodyBuilder?: FormBodyBuilder<T>;
   validationSchema: Yup.ObjectSchema<T>;
+  validate?: (values: T) => Record<string, string>;
   initialValues: T;
   onSubmit?: (
     isSuccess: boolean,
@@ -94,6 +93,7 @@ export function ConnectorForm<T extends Yup.AnyObject>({
   formBody,
   formBodyBuilder,
   validationSchema,
+  validate,
   initialValues,
   refreshFreq,
   pruneFreq,
@@ -138,6 +138,7 @@ export function ConnectorForm<T extends Yup.AnyObject>({
           ...initialValues,
         }}
         validationSchema={finalValidationSchema}
+        validate={validate}
         onSubmit={async (values, formikHelpers) => {
           formikHelpers.setSubmitting(true);
           const connectorName = nameBuilder(values);
@@ -162,7 +163,6 @@ export function ConnectorForm<T extends Yup.AnyObject>({
             });
             return;
           }
-
           const { message, isSuccess, response } = await submitConnector<T>({
             name: connectorName,
             source,

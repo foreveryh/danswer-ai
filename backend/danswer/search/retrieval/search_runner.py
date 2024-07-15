@@ -20,6 +20,7 @@ from danswer.search.models import MAX_METRICS_CONTENT
 from danswer.search.models import RetrievalMetricsContainer
 from danswer.search.models import SearchQuery
 from danswer.search.models import SearchType
+from danswer.search.postprocessing.postprocessing import cleanup_chunks
 from danswer.search.search_nlp_models import EmbeddingModel
 from danswer.search.utils import inference_section_from_chunks
 from danswer.secondary_llm_flows.query_expansion import multilingual_query_expansion
@@ -130,6 +131,8 @@ def doc_index_retrieval(
             query_prefix=db_embedding_model.query_prefix,
             passage_prefix=db_embedding_model.passage_prefix,
             normalize=db_embedding_model.normalize,
+            api_key=db_embedding_model.api_key,
+            provider_type=db_embedding_model.provider_type,
             # The below are globally set, this flow always uses the indexing one
             server_host=MODEL_SERVER_HOST,
             server_port=MODEL_SERVER_PORT,
@@ -160,7 +163,7 @@ def doc_index_retrieval(
         else:
             raise RuntimeError("Invalid Search Flow")
 
-    return top_chunks
+    return cleanup_chunks(top_chunks)
 
 
 def _simplify_text(text: str) -> str:

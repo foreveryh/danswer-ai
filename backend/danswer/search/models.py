@@ -4,6 +4,8 @@ from typing import Any
 from pydantic import BaseModel
 from pydantic import validator
 
+from danswer.configs.chat_configs import CONTEXT_CHUNKS_ABOVE
+from danswer.configs.chat_configs import CONTEXT_CHUNKS_BELOW
 from danswer.configs.chat_configs import DISABLE_LLM_CHUNK_FILTER
 from danswer.configs.chat_configs import HYBRID_ALPHA
 from danswer.configs.chat_configs import NUM_RERANKED_RESULTS
@@ -47,8 +49,8 @@ class ChunkMetric(BaseModel):
 class ChunkContext(BaseModel):
     # Additional surrounding context options, if full doc, then chunks are deduped
     # If surrounding context overlap, it is combined into one
-    chunks_above: int = 0
-    chunks_below: int = 0
+    chunks_above: int = CONTEXT_CHUNKS_ABOVE
+    chunks_below: int = CONTEXT_CHUNKS_BELOW
     full_doc: bool = False
 
     @validator("chunks_above", "chunks_below", pre=True, each_item=False)
@@ -187,6 +189,21 @@ class InferenceChunk(BaseChunk):
         return self.score > other.score
 
 
+class InferenceChunkUncleaned(InferenceChunk):
+    title: str | None  # Separate from Semantic Identifier though often same
+    metadata_suffix: str | None
+
+    def to_inference_chunk(self) -> InferenceChunk:
+        # Create a dict of all fields except 'title' and 'metadata_suffix'
+        # Assumes the cleaning has already been applied and just needs to translate to the right type
+        inference_chunk_data = {
+            k: v
+            for k, v in self.dict().items()
+            if k not in ["title", "metadata_suffix"]
+        }
+        return InferenceChunk(**inference_chunk_data)
+
+
 class InferenceSection(BaseModel):
     """Section list of chunks with a combined content. A section could be a single chunk, several
     chunks from the same document or the entire document."""
@@ -247,6 +264,13 @@ class SavedSearchDoc(SearchDoc):
         if not isinstance(other, SavedSearchDoc):
             return NotImplemented
         return self.score < other.score
+
+
+class SavedSearchDocWithContent(SavedSearchDoc):
+    """Used for endpoints that need to return the actual contents of the retrieved
+    section in addition to the match_highlights."""
+
+    content: str
 
 
 class RetrievalDocs(BaseModel):

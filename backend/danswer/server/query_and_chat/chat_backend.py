@@ -303,7 +303,6 @@ def handle_new_chat_message(
             request.headers
         ),
     )
-
     return StreamingResponse(packets, media_type="application/json")
 
 
@@ -484,6 +483,7 @@ def upload_files_for_chat(
         "text/tab-separated-values",
         "application/json",
         "application/xml",
+        "text/xml",
         "application/x-yaml",
     }
     document_content_types = {

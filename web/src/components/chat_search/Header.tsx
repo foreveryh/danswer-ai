@@ -67,7 +67,7 @@ export default function FunctionalHeader({
               {enterpriseSettings && enterpriseSettings.application_name ? (
                 <HeaderTitle>{enterpriseSettings.application_name}</HeaderTitle>
               ) : (
-                <HeaderTitle>Danswer</HeaderTitle>
+                <HeaderTitle>Neuxnet.AI</HeaderTitle>
               )}
             </div>
           </div>

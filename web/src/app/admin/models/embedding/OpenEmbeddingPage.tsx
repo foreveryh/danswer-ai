@@ -40,9 +40,9 @@ export default function OpenEmbeddingPage({
         </a>
         .
         <br />
-        <b>NOTE:</b> not all models listed will work with Danswer, since some
+        <b>NOTE:</b> not all models listed will work with Nanswer, since some
         have unique interfaces or special requirements. If in doubt, reach out
-        to the Danswer team.
+        to the Nanswer team.
       </Text>
 
       <div className="w-full flex">

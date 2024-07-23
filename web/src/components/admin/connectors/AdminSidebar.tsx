@@ -51,12 +51,12 @@ export function AdminSidebar({ collections }: { collections: Collection[] }) {
                       </HeaderTitle>
                       {!NEXT_PUBLIC_DO_NOT_USE_TOGGLE_OFF_DANSWER_POWERED && (
                         <p className="text-xs text-subtle">
-                          Powered by Danswer
+                          Powered by Neuxnet.AI
                         </p>
                       )}
                     </div>
                   ) : (
-                    <HeaderTitle>Danswer</HeaderTitle>
+                    <HeaderTitle>Neuxnet.AI</HeaderTitle>
                   )}
                 </div>
               </div>
@@ -67,7 +67,7 @@ export function AdminSidebar({ collections }: { collections: Collection[] }) {
           <Link href={"/chat"}>
             <button className="text-sm block w-48 py-2.5 flex px-2 text-left bg-background-200 hover:bg-background-200/80 cursor-pointer rounded">
               <BackIcon size={20} className="text-neutral" />
-              <p className="ml-1">Back to Danswer</p>
+              <p className="ml-1">Back to Neuxnet.AI</p>
             </button>
           </Link>
         </div>

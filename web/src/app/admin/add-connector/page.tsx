@@ -49,8 +49,8 @@ export default function Page() {
       />
 
       <Text>
-        Connect AnswerME to your organization&apos;s knowledge sources.
-        We&apos;ll automatically sync your data into AnswerME, so you can find
+        Connect Nanswer to your organization&apos;s knowledge sources.
+        We&apos;ll automatically sync your data into Nanswer, so you can find
         exactly what you&apos;re looking for in one place.
       </Text>
 

@@ -618,7 +618,7 @@ export function AssistantEditor({
                                         <>
                                           If this functionality would be useful,
                                           reach out to the administrators of
-                                          Danswer for assistance.
+                                          Nanswer for assistance.
                                         </>
                                       )}
                                     </Italic>

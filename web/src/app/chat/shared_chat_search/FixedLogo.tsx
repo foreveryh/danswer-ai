@@ -22,11 +22,11 @@ export default function FixedLogo() {
             <div>
               <HeaderTitle>{enterpriseSettings.application_name}</HeaderTitle>
               {!NEXT_PUBLIC_DO_NOT_USE_TOGGLE_OFF_DANSWER_POWERED && (
-                <p className="text-xs text-subtle">Powered by Danswer</p>
+                <p className="text-xs text-subtle">Powered by Neuxnet.AI</p>
               )}
             </div>
           ) : (
-            <HeaderTitle>Danswer</HeaderTitle>
+            <HeaderTitle>Neuxnet.AI</HeaderTitle>
           )}
         </div>
       </div>

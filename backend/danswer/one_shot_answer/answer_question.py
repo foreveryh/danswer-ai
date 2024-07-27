@@ -129,7 +129,7 @@ def stream_answer_objects(
         messages=history, max_tokens=max_history_tokens
     )
 
-    rephrased_query = thread_based_query_rephrase(
+    rephrased_query = query_req.query_override or thread_based_query_rephrase(
         user_query=query_msg.message,
         history_str=history_str,
     )
@@ -206,6 +206,7 @@ def stream_answer_objects(
         single_message_history=history_str,
         tools=[search_tool],
         force_use_tool=ForceUseTool(
+            force_use=True,
             tool_name=search_tool.name,
             args={"query": rephrased_query},
         ),
@@ -256,6 +257,9 @@ def stream_answer_objects(
                 )
                 yield initial_response
 
+            elif packet.id == SEARCH_DOC_CONTENT_ID:
+                yield packet.response
+
             elif packet.id == SECTION_RELEVANCE_LIST_ID:
                 chunk_indices = packet.response
 
@@ -267,9 +271,6 @@ def stream_answer_objects(
                     )
 
                 yield LLMRelevanceFilterResponse(relevant_chunk_indices=packet.response)
-
-            elif packet.id == SEARCH_DOC_CONTENT_ID:
-                yield packet.response
 
             elif packet.id == SEARCH_EVALUATION_ID:
                 evaluation_response = LLMRelevanceSummaryResponse(

@@ -242,12 +242,12 @@ const SOURCE_METADATA_MAP: SourceMap = {
     category: SourceCategory.CustomerSupport,
     docs: "https://docs.danswer.dev/connectors/requesttracker",
   },
-  paperless: {
-    icon: BookstackIcon,
-    displayName: "Paperless",
-    category: SourceCategory.Wiki,
-    docs: "https://docs.danswer.dev/connectors/wikipedia",
-  },
+  // paperless: {
+  //   icon: BookstackIcon,
+  //   displayName: "Paperless",
+  //   category: SourceCategory.Wiki,
+  //   docs: "https://docs.danswer.dev/connectors/wikipedia",
+  // },
   clickup: {
     icon: ClickupIcon,
     displayName: "Clickup",

@@ -245,7 +245,8 @@ const SOURCE_METADATA_MAP: SourceMap = {
   paperless: {
     icon: BookstackIcon,
     displayName: "Paperless",
-    category: SourceCategory.AppConnection,
+    category: SourceCategory.Wiki,
+    docs: "https://docs.danswer.dev/connectors/wikipedia",
   },
   clickup: {
     icon: ClickupIcon,

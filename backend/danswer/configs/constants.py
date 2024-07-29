@@ -98,7 +98,7 @@ class DocumentSource(str, Enum):
     SALESFORCE = "salesforce"
     DISCOURSE = "discourse"
     AXERO = "axero"
-    PAPERLESS = "paperless"
+    #PAPERLESS = "paperless"
     CLICKUP = "clickup"
     MEDIAWIKI = "mediawiki"
     WIKIPEDIA = "wikipedia"

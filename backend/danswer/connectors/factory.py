@@ -43,7 +43,7 @@ from danswer.connectors.web.connector import WebConnector
 from danswer.connectors.wikipedia.connector import WikipediaConnector
 from danswer.connectors.zendesk.connector import ZendeskConnector
 from danswer.connectors.zulip.connector import ZulipConnector
-#from danswer.connectors.paperless.connector import PaperlessConnector
+from danswer.connectors.paperless.connector import PaperlessConnector
 from danswer.db.credentials import backend_update_credential_json
 from danswer.db.models import Credential
 

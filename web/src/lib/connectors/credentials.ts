@@ -116,6 +116,12 @@ export interface Document360CredentialJson {
   document360_api_token: string;
 }
 
+export interface PaperlessCredentialJson {
+    //Paperless
+    paperless_base_url: string;
+    paperless_api_token: string;
+}
+
 export interface ClickupCredentialJson {
   clickup_api_token: string;
   clickup_team_id: string;
@@ -219,6 +225,10 @@ export const credentialTemplates: Record<ValidSources, any> = {
     portal_id: "",
     document360_api_token: "",
   } as Document360CredentialJson,
+  paperless: {
+    paperless_base_url: "",
+    paperless_api_token: "",
+  } as PaperlessCredentialJson,
   requesttracker: {
     requesttracker_username: "",
     requesttracker_password: "",
@@ -370,6 +380,10 @@ export const credentialDisplayNames: Record<string, string> = {
   // Document360
   portal_id: "Document360 Portal ID",
   document360_api_token: "Document360 API Token",
+
+  //PaperLess
+  paperless_base_url: "Paperless Base URL",
+  paperless_api_token: "Paperless API Token",
 
   // Clickup
   clickup_api_token: "ClickUp API Token",

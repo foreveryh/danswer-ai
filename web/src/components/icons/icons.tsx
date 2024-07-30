@@ -81,6 +81,7 @@ import clickupIcon from "../../../public/Clickup.svg";
 import cohereIcon from "../../../public/Cohere.svg";
 import voyageIcon from "../../../public/Voyage.png";
 import googleIcon from "../../../public/Google.webp";
+import paperlessIcon from "../../../public/Document360.png";
 
 import { FaRobot, FaSlack } from "react-icons/fa";
 import { IconType } from "react-icons";
@@ -1229,6 +1230,20 @@ export const Document360Icon = ({
       className={`w-[${size + 4}px] h-[${size + 4}px] -m-0.5 ` + className}
     >
       <Image src={document360Icon} alt="Logo" width="96" height="96" />
+    </div>
+  );
+};
+
+export const PaperlessIcon = ({
+  size = 16,
+  className = defaultTailwindCSS,
+}: IconProps) => {
+  return (
+    <div
+      style={{ width: `${size + 4}px`, height: `${size + 4}px` }}
+      className={`w-[${size + 4}px] h-[${size + 4}px] -m-0.5 ` + className}
+    >
+      <Image src={paperlessIcon} alt="Logo" width="96" height="96" />
     </div>
   );
 };

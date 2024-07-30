@@ -36,6 +36,7 @@ import {
   OCIStorageIcon,
   GoogleStorageIcon,
   ColorSlackIcon,
+  PaperlessIcon,
 } from "@/components/icons/icons";
 import { ValidSources } from "./types";
 import {
@@ -168,6 +169,12 @@ const SOURCE_METADATA_MAP: SourceMap = {
   document360: {
     icon: Document360Icon,
     displayName: "Document360",
+    category: SourceCategory.Wiki,
+    docs: "https://docs.danswer.dev/connectors/document360",
+  },
+  paperless: {
+    icon: PaperlessIcon,
+    displayName: "Paperless",
     category: SourceCategory.Wiki,
     docs: "https://docs.danswer.dev/connectors/document360",
   },

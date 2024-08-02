@@ -265,13 +265,8 @@ function Main() {
   return (
     <div className="h-screen">
       <Text>
-<<<<<<< HEAD
-        Embedding models are used to generate embeddings for your documents,
-        which then power Nanswer&apos;s search.
-=======
         These deep learning models are used to generate vector representations
-        of your documents, which then power Danswer&apos;s search.
->>>>>>> f280586e6878bd94e707fab6cd37660d5c71b08f
+        of your documents, which then power Nanswer&apos;s search.
       </Text>
 
       {alreadySelectedModel && (

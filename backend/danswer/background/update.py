@@ -17,12 +17,14 @@ from danswer.configs.app_configs import DASK_JOB_CLIENT_ENABLED
 from danswer.configs.app_configs import DISABLE_INDEX_UPDATE_ON_SWAP
 from danswer.configs.app_configs import NUM_INDEXING_WORKERS
 from danswer.configs.app_configs import NUM_SECONDARY_INDEXING_WORKERS
+from danswer.configs.constants import POSTGRES_INDEXER_APP_NAME
 from danswer.db.connector import fetch_connectors
 from danswer.db.connector_credential_pair import fetch_connector_credential_pairs
 from danswer.db.embedding_model import get_current_db_embedding_model
 from danswer.db.embedding_model import get_secondary_db_embedding_model
 from danswer.db.engine import get_db_current_time
 from danswer.db.engine import get_sqlalchemy_engine
+from danswer.db.engine import init_sqlalchemy_engine
 from danswer.db.index_attempt import create_index_attempt
 from danswer.db.index_attempt import get_index_attempt
 from danswer.db.index_attempt import get_inprogress_index_attempts
@@ -349,16 +351,16 @@ def update_loop(
         check_index_swap(db_session=db_session)
         db_embedding_model = get_current_db_embedding_model(db_session)
 
-    # So that the first time users aren't surprised by really slow speed of first
-    # batch of documents indexed
+        # So that the first time users aren't surprised by really slow speed of first
+        # batch of documents indexed
 
-    if db_embedding_model.cloud_provider_id is None:
-        logger.info("Running a first inference to warm up embedding model")
-        warm_up_encoders(
-            embedding_model=db_embedding_model,
-            model_server_host=INDEXING_MODEL_SERVER_HOST,
-            model_server_port=MODEL_SERVER_PORT,
-        )
+        if db_embedding_model.cloud_provider_id is None:
+            logger.info("Running a first inference to warm up embedding model")
+            warm_up_encoders(
+                embedding_model=db_embedding_model,
+                model_server_host=INDEXING_MODEL_SERVER_HOST,
+                model_server_port=MODEL_SERVER_PORT,
+            )
 
     client_primary: Client | SimpleJobClient
     client_secondary: Client | SimpleJobClient
@@ -418,6 +420,7 @@ def update_loop(
 
 def update__main() -> None:
     set_is_ee_based_on_env_variable()
+    init_sqlalchemy_engine(POSTGRES_INDEXER_APP_NAME)
 
     logger.info("Starting Indexing Loop")
     update_loop()

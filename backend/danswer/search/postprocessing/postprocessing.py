@@ -99,7 +99,11 @@ def semantic_reranking(
     Note: this updates the chunks in place, it updates the chunk scores which came from retrieval
     """
     cross_encoders = CrossEncoderEnsembleModel()
-    passages = [chunk.content for chunk in chunks]
+
+    passages = [
+        f"{chunk.semantic_identifier or chunk.title or ''}\n{chunk.content}"
+        for chunk in chunks
+    ]
     sim_scores_floats = cross_encoders.predict(query=query, passages=passages)
 
     sim_scores = [numpy.array(scores) for scores in sim_scores_floats]
@@ -231,6 +235,12 @@ def search_postprocessing(
     rerank_metrics_callback: Callable[[RerankMetricsContainer], None] | None = None,
 ) -> Iterator[list[InferenceSection] | list[int]]:
     post_processing_tasks: list[FunctionCall] = []
+
+    if not retrieved_sections:
+        # Avoids trying to rerank an empty list which throws an error
+        yield []
+        yield []
+        return
 
     rerank_task_id = None
     sections_yielded = False

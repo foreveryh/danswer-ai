@@ -32,6 +32,9 @@ import {
   AssistantsIcon,
   AssistantsIconSkeleton,
   BackIcon,
+  BookIcon,
+  BookmarkIconSkeleton,
+  ClosedBookIcon,
   LefToLineIcon,
   RightToLineIcon,
 } from "@/components/icons/icons";
@@ -48,6 +51,7 @@ interface HistorySidebarProps {
   openedFolders?: { [key: number]: boolean };
   toggleSidebar?: () => void;
   toggled?: boolean;
+  removeToggle?: () => void;
 }
 
 export const HistorySidebar = forwardRef<HTMLDivElement, HistorySidebarProps>(
@@ -60,6 +64,7 @@ export const HistorySidebar = forwardRef<HTMLDivElement, HistorySidebarProps>(
       folders,
       openedFolders,
       toggleSidebar,
+      removeToggle,
     },
     ref: ForwardedRef<HTMLDivElement>
   ) => {
@@ -101,11 +106,11 @@ export const HistorySidebar = forwardRef<HTMLDivElement, HistorySidebarProps>(
             transition-transform`}
         >
           <div className="max-w-full ml-3 mr-3 mt-2 flex flex gap-x-1 items-center my-auto text-text-700 text-xl">
-            <div className="mr-1 invisible mb-auto h-6 w-6">
+            <div className="mr-1 desktop:invisible mb-auto h-6 w-6">
               <Logo height={24} width={24} />
             </div>
 
-            <div className="invisible">
+            <div className="desktop:invisible">
               {enterpriseSettings && enterpriseSettings.application_name ? (
                 <div>
                   <HeaderTitle>
@@ -119,13 +124,18 @@ export const HistorySidebar = forwardRef<HTMLDivElement, HistorySidebarProps>(
                 <HeaderTitle>Neuxnet.AI</HeaderTitle>
               )}
             </div>
+
             {toggleSidebar && (
               <Tooltip
                 delayDuration={0}
                 content={toggled ? `Unpin sidebar` : "Pin sidebar"}
               >
                 <button className="my-auto ml-auto" onClick={toggleSidebar}>
-                  {!toggled ? <RightToLineIcon /> : <LefToLineIcon />}
+                  {!toggled && !combinedSettings.isMobile ? (
+                    <RightToLineIcon />
+                  ) : (
+                    <LefToLineIcon />
+                  )}
                 </button>
               </Tooltip>
             )}
@@ -177,11 +187,21 @@ export const HistorySidebar = forwardRef<HTMLDivElement, HistorySidebarProps>(
                   Manage Assistants
                 </p>
               </Link>
+              <Link
+                href="/prompts"
+                className="w-full p-2 bg-white border-border border rounded items-center hover:bg-background-200 cursor-pointer transition-all duration-150 flex gap-x-2"
+              >
+                <ClosedBookIcon className="h-4 w-4 my-auto" />
+                <p className="my-auto flex items-center text-sm">
+                  Manage Prompts
+                </p>
+              </Link>
             </div>
           )}
           <div className="border-b border-border pb-4 mx-3" />
 
           <PagesTab
+            closeSidebar={removeToggle}
             page={page}
             existingChats={existingChats}
             currentChatId={currentChatId}

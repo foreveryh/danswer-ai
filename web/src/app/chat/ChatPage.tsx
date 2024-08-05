@@ -207,10 +207,6 @@ export function ChatPage({
       if (chatSessionIdRef.current !== null) {
         setHasPerformedInitialScroll(false);
       }
-
-      if (isStreaming) {
-        setIsCancelled(true);
-      }
     }
 
     async function initialSessionFetch() {
@@ -451,8 +447,6 @@ export function ChatPage({
   const [sharingModalVisible, setSharingModalVisible] =
     useState<boolean>(false);
 
-  // state for cancelling streaming
-  const [isCancelled, setIsCancelled] = useState(false);
   const [aboveHorizon, setAboveHorizon] = useState(false);
 
   const scrollableDivRef = useRef<HTMLDivElement>(null);
@@ -516,11 +510,6 @@ export function ChatPage({
       setHasPerformedInitialScroll(true);
     }, 50);
   };
-
-  const isCancelledRef = useRef<boolean>(isCancelled); // scroll is cancelled
-  useEffect(() => {
-    isCancelledRef.current = isCancelled;
-  }, [isCancelled]);
 
   const distance = 500; // distance that should "engage" the scroll
   const debounce = 100; // time for debouncing
@@ -599,11 +588,6 @@ export function ChatPage({
         for (const packet of packetBunch) {
           stack.push(packet);
         }
-
-        if (isCancelledRef.current) {
-          setIsCancelled(false);
-          break;
-        }
       }
     } catch (error) {
       stack.error = String(error);
@@ -635,6 +619,15 @@ export function ChatPage({
     isSeededChat?: boolean;
     alternativeAssistantOverride?: Persona | null;
   } = {}) => {
+    if (isStreaming) {
+      setPopup({
+        message: "Please wait for the response to complete",
+        type: "error",
+      });
+
+      return;
+    }
+
     setAlternativeGeneratingAssistant(alternativeAssistantOverride);
     clientScrollToBottom();
     let currChatSessionId: number;
@@ -806,7 +799,6 @@ export function ChatPage({
 
         if (!stack.isEmpty()) {
           const packet = stack.nextPacket();
-
           if (packet) {
             if (Object.hasOwn(packet, "answer_piece")) {
               answer += (packet as AnswerPiecePacket).answer_piece;
@@ -872,10 +864,6 @@ export function ChatPage({
                 alternateAssistantID: alternativeAssistant?.id,
               },
             ]);
-          }
-          if (isCancelledRef.current) {
-            setIsCancelled(false);
-            break;
           }
         }
       }
@@ -1227,7 +1215,7 @@ export function ChatPage({
                   duration-300 
                   ease-in-out
                   h-full
-                  ${toggledSidebar || showDocSidebar ? "w-[250px]" : "w-[0px]"}
+                  ${toggledSidebar ? "w-[250px]" : "w-[0px]"}
                   `}
                 />
                 <ChatBanner />
@@ -1523,17 +1511,13 @@ export function ChatPage({
                                     messageId={null}
                                     personaName={liveAssistant.name}
                                     content={
-                                      <div className="text-sm my-auto">
-                                        <ThreeDots
-                                          height="30"
-                                          width="50"
-                                          color="#3b82f6"
-                                          ariaLabel="grid-loading"
-                                          radius="12.5"
-                                          wrapperStyle={{}}
-                                          wrapperClass=""
-                                          visible={true}
-                                        />
+                                      <div
+                                        key={"Generating"}
+                                        className="mr-auto relative inline-block"
+                                      >
+                                        <span className="text-sm loading-text">
+                                          Thinking...
+                                        </span>
                                       </div>
                                     }
                                   />
@@ -1614,7 +1598,6 @@ export function ChatPage({
                               setMessage={setMessage}
                               onSubmit={onSubmit}
                               isStreaming={isStreaming}
-                              setIsCancelled={setIsCancelled}
                               filterManager={filterManager}
                               llmOverrideManager={llmOverrideManager}
                               files={currentMessageFiles}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Table,
   TableRow,
@@ -6,6 +6,7 @@ import {
   TableBody,
   TableCell,
   Badge,
+  Button,
 } from "@tremor/react";
 import { IndexAttemptStatus } from "@/components/Status";
 import { timeAgo } from "@/lib/time";
@@ -28,6 +29,8 @@ import { SourceIcon } from "@/components/SourceIcon";
 import { getSourceDisplayName } from "@/lib/sources";
 import { CustomTooltip } from "@/components/tooltip/CustomTooltip";
 import { Warning } from "@phosphor-icons/react";
+import Cookies from "js-cookie";
+import { TOGGLED_CONNECTORS_COOKIE_NAME } from "@/lib/constants";
 
 const columnWidths = {
   first: "20%",
@@ -127,7 +130,7 @@ function ConnectorRow({
   ccPairsIndexingStatus,
   invisible,
 }: {
-  ccPairsIndexingStatus: any;
+  ccPairsIndexingStatus: ConnectorIndexingStatus<any, any>;
   invisible?: boolean;
 }) {
   const router = useRouter();
@@ -206,7 +209,9 @@ function ConnectorRow({
 
   return (
     <TableRow
-      className={`hover:bg-hover-light ${invisible ? "invisible h-0 !-mb-10" : "border border-border !border-b"}  w-full cursor-pointer relative`}
+      className={`hover:bg-hover-light ${
+        invisible ? "invisible h-0 !-mb-10" : "border border-border !border-b"
+      }  w-full cursor-pointer relative`}
       onClick={() =>
         router.push(`/admin/connector/${ccPairsIndexingStatus.cc_pair_id}`)
       }
@@ -253,10 +258,22 @@ export function CCPairIndexingStatusTable({
 }: {
   ccPairsIndexingStatuses: ConnectorIndexingStatus<any, any>[];
 }) {
-  const [allToggleTracker, setAllToggleTracker] = useState(true);
-  const [openSources, setOpenSources] = useState<Record<ValidSources, boolean>>(
-    {} as Record<ValidSources, boolean>
-  );
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, []);
+
+  const [connectorsToggled, setConnectorsToggled] = useState<
+    Record<ValidSources, boolean>
+  >(() => {
+    const savedState = Cookies.get(TOGGLED_CONNECTORS_COOKIE_NAME);
+    return savedState ? JSON.parse(savedState) : {};
+  });
 
   const { groupedStatuses, sortedSources, groupSummaries } = useMemo(() => {
     const grouped: Record<ValidSources, ConnectorIndexingStatus<any, any>[]> =
@@ -295,39 +312,39 @@ export function CCPairIndexingStatusTable({
     };
   }, [ccPairsIndexingStatuses]);
 
-  const toggleSource = (source: ValidSources) => {
-    setOpenSources((prev) => ({
-      ...prev,
-      [source]: !prev[source],
-    }));
-  };
-
-  const toggleSources = (toggle: boolean) => {
-    const updatedSources = Object.fromEntries(
-      sortedSources.map((item) => [item, toggle])
+  const toggleSource = (
+    source: ValidSources,
+    toggled: boolean | null = null
+  ) => {
+    const newConnectorsToggled = {
+      ...connectorsToggled,
+      [source]: toggled == null ? !connectorsToggled[source] : toggled,
+    };
+    setConnectorsToggled(newConnectorsToggled);
+    Cookies.set(
+      TOGGLED_CONNECTORS_COOKIE_NAME,
+      JSON.stringify(newConnectorsToggled)
     );
-    setOpenSources(updatedSources as Record<ValidSources, boolean>);
-    setAllToggleTracker(!toggle);
   };
+  const toggleSources = () => {
+    const currentToggledCount =
+      Object.values(connectorsToggled).filter(Boolean).length;
+    const shouldToggleOn = currentToggledCount < sortedSources.length / 2;
 
-  const router = useRouter();
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey) {
-        switch (event.key.toLowerCase()) {
-          case "e":
-            toggleSources(false);
-            event.preventDefault();
-            break;
-        }
-      }
-    };
-    toggleSources(true);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [router, allToggleTracker]);
+    const connectors = sortedSources.reduce(
+      (acc, source) => {
+        acc[source] = shouldToggleOn;
+        return acc;
+      },
+      {} as Record<ValidSources, boolean>
+    );
+
+    setConnectorsToggled(connectors);
+    Cookies.set(TOGGLED_CONNECTORS_COOKIE_NAME, JSON.stringify(connectors));
+  };
+  const shouldExpand =
+    Object.values(connectorsToggled).filter(Boolean).length <
+    sortedSources.length / 2;
 
   return (
     <div className="-mt-20">
@@ -339,65 +356,136 @@ export function CCPairIndexingStatusTable({
             name: "Sample File Connector",
             last_status: "success",
             connector: {
+              name: "Sample File Connector",
               source: "file",
+              input_type: "poll",
+              connector_specific_config: {
+                file_locations: ["/path/to/sample/file.txt"],
+              },
+              refresh_freq: 86400,
+              prune_freq: null,
+              indexing_start: new Date("2023-07-01T12:00:00Z"),
               disabled: false,
+              id: 1,
+              credential_ids: [],
+              time_created: "2023-07-01T12:00:00Z",
+              time_updated: "2023-07-01T12:00:00Z",
+            },
+            credential: {
+              id: 1,
+              name: "Sample Credential",
+              source: "file",
+              user_id: "1",
+              time_created: "2023-07-01T12:00:00Z",
+              time_updated: "2023-07-01T12:00:00Z",
+              credential_json: {},
+              admin_public: false,
             },
             public_doc: true,
             docs_indexed: 1000,
             last_success: "2023-07-01T12:00:00Z",
+            last_finished_status: "success",
+            latest_index_attempt: null,
+            owner: "1",
+            error_msg: "",
+            deletion_attempt: null,
+            is_deletable: true,
           }}
         />
         <div className="-mb-10" />
+
         <TableBody>
-          {sortedSources.map((source, ind) => (
-            <React.Fragment key={ind}>
-              <div className="mt-4" />
+          <div className="flex items-center mt-4 gap-x-2">
+            <input
+              type="text"
+              ref={searchInputRef}
+              placeholder="Search connectors..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="ml-2 w-96 h-9 flex-none rounded-md border-2 border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
 
-              <SummaryRow
-                source={source}
-                summary={groupSummaries[source]}
-                isOpen={openSources[source] || false}
-                onToggle={() => toggleSource(source)}
-              />
+            <Button className="h-9" onClick={() => toggleSources()}>
+              {!shouldExpand ? "Collapse All" : "Expand All"}
+            </Button>
+          </div>
+          {sortedSources.map((source, ind) => {
+            const sourceMatches = source
+              .toLowerCase()
+              .includes(searchTerm.toLowerCase());
+            const matchingConnectors = groupedStatuses[source].filter(
+              (status) =>
+                (status.name || "")
+                  .toLowerCase()
+                  .includes(searchTerm.toLowerCase())
+            );
+            if (sourceMatches || matchingConnectors.length > 0) {
+              return (
+                <React.Fragment key={ind}>
+                  <div className="mt-4" />
 
-              {openSources[source] && (
-                <>
-                  <TableRow className="border border-border">
-                    <TableHeaderCell className={`w-[${columnWidths.first}]`}>
-                      Name
-                    </TableHeaderCell>
-                    <TableHeaderCell className={`w-[${columnWidths.fifth}]`}>
-                      Last Indexed
-                    </TableHeaderCell>
-                    <TableHeaderCell className={`w-[${columnWidths.second}]`}>
-                      Activity
-                    </TableHeaderCell>
-                    <TableHeaderCell className={`w-[${columnWidths.fourth}]`}>
-                      Public
-                    </TableHeaderCell>
-                    <TableHeaderCell className={`w-[${columnWidths.sixth}]`}>
-                      Total Docs
-                    </TableHeaderCell>
-                    <TableHeaderCell className={`w-[${columnWidths.third}]`}>
-                      Last Status
-                    </TableHeaderCell>
-                    <TableHeaderCell
-                      className={`w-[${columnWidths.seventh}]`}
-                    ></TableHeaderCell>
-                  </TableRow>
-                  {groupedStatuses[source].map((ccPairsIndexingStatus) => (
-                    <ConnectorRow
-                      key={ccPairsIndexingStatus.cc_pair_id}
-                      ccPairsIndexingStatus={ccPairsIndexingStatus}
-                    />
-                  ))}
-                </>
-              )}
-            </React.Fragment>
-          ))}
+                  <SummaryRow
+                    source={source}
+                    summary={groupSummaries[source]}
+                    isOpen={connectorsToggled[source] || false}
+                    onToggle={() => toggleSource(source)}
+                  />
+
+                  {connectorsToggled[source] && (
+                    <>
+                      <TableRow className="border border-border">
+                        <TableHeaderCell
+                          className={`w-[${columnWidths.first}]`}
+                        >
+                          Name
+                        </TableHeaderCell>
+                        <TableHeaderCell
+                          className={`w-[${columnWidths.fifth}]`}
+                        >
+                          Last Indexed
+                        </TableHeaderCell>
+                        <TableHeaderCell
+                          className={`w-[${columnWidths.second}]`}
+                        >
+                          Activity
+                        </TableHeaderCell>
+                        <TableHeaderCell
+                          className={`w-[${columnWidths.fourth}]`}
+                        >
+                          Public
+                        </TableHeaderCell>
+                        <TableHeaderCell
+                          className={`w-[${columnWidths.sixth}]`}
+                        >
+                          Total Docs
+                        </TableHeaderCell>
+                        <TableHeaderCell
+                          className={`w-[${columnWidths.third}]`}
+                        >
+                          Last Status
+                        </TableHeaderCell>
+                        <TableHeaderCell
+                          className={`w-[${columnWidths.seventh}]`}
+                        ></TableHeaderCell>
+                      </TableRow>
+                      {(sourceMatches
+                        ? groupedStatuses[source]
+                        : matchingConnectors
+                      ).map((ccPairsIndexingStatus) => (
+                        <ConnectorRow
+                          key={ccPairsIndexingStatus.cc_pair_id}
+                          ccPairsIndexingStatus={ccPairsIndexingStatus}
+                        />
+                      ))}
+                    </>
+                  )}
+                </React.Fragment>
+              );
+            }
+            return null;
+          })}
         </TableBody>
 
-        {/* Padding between table and bottom of page */}
         <div className="invisible w-full pb-40" />
       </Table>
     </div>

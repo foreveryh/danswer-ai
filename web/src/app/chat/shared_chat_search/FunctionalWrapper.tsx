@@ -28,7 +28,7 @@ const ToggleSwitch = () => {
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     localStorage.setItem("activeTab", tab);
-    if (settings?.isMobile) {
+    if (settings?.isMobile && window) {
       window.location.href = tab;
     } else {
       router.push(tab === "search" ? "/search" : "/chat");
@@ -77,11 +77,9 @@ const ToggleSwitch = () => {
 };
 
 export default function FunctionalWrapper({
-  // children,
   initiallyToggled,
   content,
 }: {
-  // children: React.ReactNode;
   content: (toggledSidebar: boolean, toggle: () => void) => ReactNode;
   initiallyToggled: boolean;
 }) {

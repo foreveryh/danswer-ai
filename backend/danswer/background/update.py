@@ -81,23 +81,27 @@ def _should_create_new_indexing(
                 return False
         return True
 
-    # If the connector is disabled, don't index
+    # If the connector is disabled or is the ingestion API, don't index
     # NOTE: during an embedding model switch over, the following logic
     # is bypassed by the above check for a future model
-    if connector.disabled:
-        return False
-
-    if connector.refresh_freq is None:
+    if connector.disabled or connector.id == 0:
         return False
 
     if not last_index:
         return True
 
-    # Only one scheduled job per connector at a time
-    # Can schedule another one if the current one is already running however
-    # Because the currently running one will not be until the latest time
-    # Note, this last index is for the given embedding model
-    if last_index.status == IndexingStatus.NOT_STARTED:
+    if connector.refresh_freq is None:
+        return False
+
+    # Only one scheduled/ongoing job per connector at a time
+    # this prevents cases where
+    # (1) the "latest" index_attempt is scheduled so we show
+    #     that in the UI despite another index_attempt being in-progress
+    # (2) multiple scheduled index_attempts at a time
+    if (
+        last_index.status == IndexingStatus.NOT_STARTED
+        or last_index.status == IndexingStatus.IN_PROGRESS
+    ):
         return False
 
     current_db_time = get_db_current_time(db_session)
@@ -283,10 +287,12 @@ def kickoff_indexing_jobs(
             if attempt.id not in existing_jobs
         ]
 
-    logger.info(f"Found {len(new_indexing_attempts)} new indexing tasks.")
+    logger.debug(f"Found {len(new_indexing_attempts)} new indexing task(s).")
 
     if not new_indexing_attempts:
         return existing_jobs
+
+    indexing_attempt_count = 0
 
     for attempt, embedding_model in new_indexing_attempts:
         use_secondary_index = (
@@ -329,14 +335,28 @@ def kickoff_indexing_jobs(
             )
 
         if run:
-            secondary_str = "(secondary index) " if use_secondary_index else ""
+            if indexing_attempt_count == 0:
+                logger.info(
+                    f"Indexing dispatch starts: pending={len(new_indexing_attempts)}"
+                )
+
+            indexing_attempt_count += 1
+            secondary_str = " (secondary index)" if use_secondary_index else ""
             logger.info(
-                f"Kicked off {secondary_str}"
-                f"indexing attempt for connector: '{attempt.connector_credential_pair.connector.name}', "
-                f"with config: '{attempt.connector_credential_pair.connector.connector_specific_config}', and "
-                f"with credentials: '{attempt.connector_credential_pair.credential_id}'"
+                f"Indexing dispatched{secondary_str}: "
+                f"connector='{attempt.connector_credential_pair.connector.name}' "
+                f"config='{attempt.connector_credential_pair.connector.connector_specific_config}' "
+                f"credentials='{attempt.connector_credential_pair.credential_id}'"
             )
             existing_jobs_copy[attempt.id] = run
+
+    if indexing_attempt_count > 0:
+        logger.info(
+            f"Indexing dispatch results: "
+            f"initial_pending={len(new_indexing_attempts)} "
+            f"started={indexing_attempt_count} "
+            f"remaining={len(new_indexing_attempts) - indexing_attempt_count}"
+        )
 
     return existing_jobs_copy
 
@@ -355,7 +375,7 @@ def update_loop(
         # batch of documents indexed
 
         if db_embedding_model.cloud_provider_id is None:
-            logger.info("Running a first inference to warm up embedding model")
+            logger.debug("Running a first inference to warm up embedding model")
             warm_up_encoders(
                 embedding_model=db_embedding_model,
                 model_server_host=INDEXING_MODEL_SERVER_HOST,
@@ -392,11 +412,11 @@ def update_loop(
     while True:
         start = time.time()
         start_time_utc = datetime.utcfromtimestamp(start).strftime("%Y-%m-%d %H:%M:%S")
-        logger.info(f"Running update, current UTC time: {start_time_utc}")
+        logger.debug(f"Running update, current UTC time: {start_time_utc}")
 
         if existing_jobs:
             # TODO: make this debug level once the "no jobs are being scheduled" issue is resolved
-            logger.info(
+            logger.debug(
                 "Found existing indexing jobs: "
                 f"{[(attempt_id, job.status) for attempt_id, job in existing_jobs.items()]}"
             )
@@ -422,7 +442,7 @@ def update__main() -> None:
     set_is_ee_based_on_env_variable()
     init_sqlalchemy_engine(POSTGRES_INDEXER_APP_NAME)
 
-    logger.info("Starting Indexing Loop")
+    logger.info("Starting indexing service")
     update_loop()
 
 

@@ -170,11 +170,12 @@ export const SearchSection = ({
     if (existingSearchIdRaw == null) {
       return;
     }
-    function extractFirstUserMessage(
-      chatSession: SearchSession
+    function extractFirstMessageByType(
+      chatSession: SearchSession,
+      messageType: "user" | "assistant"
     ): string | null {
       const userMessage = chatSession?.messages.find(
-        (msg) => msg.message_type === "user"
+        (msg) => msg.message_type === messageType
       );
       return userMessage ? userMessage.message : null;
     }
@@ -184,14 +185,18 @@ export const SearchSection = ({
         `/api/query/search-session/${existingSearchessionId}`
       );
       const searchSession = (await response.json()) as SearchSession;
-      const message = extractFirstUserMessage(searchSession);
+      const userMessage = extractFirstMessageByType(searchSession, "user");
+      const assistantMessage = extractFirstMessageByType(
+        searchSession,
+        "assistant"
+      );
 
-      if (message) {
-        setQuery(message);
+      if (userMessage) {
+        setQuery(userMessage);
         const danswerDocs: SearchResponse = {
           documents: searchSession.documents,
           suggestedSearchType: null,
-          answer: null,
+          answer: assistantMessage || "Search response not found",
           quotes: null,
           selectedDocIndices: null,
           error: null,
@@ -536,6 +541,7 @@ export const SearchSection = ({
         >
           <div className="w-full relative">
             <HistorySidebar
+              reset={() => setQuery("")}
               page="search"
               ref={innerSidebarElementRef}
               toggleSidebar={toggleSidebar}
@@ -547,6 +553,7 @@ export const SearchSection = ({
 
         <div className="absolute left-0 w-full top-0">
           <FunctionalHeader
+            reset={() => setQuery("")}
             toggleSidebar={toggleSidebar}
             page="search"
             user={user}
@@ -716,7 +723,7 @@ export const SearchSection = ({
                           />
                         </div>
 
-                        {quotes !== null && answer && (
+                        {quotes !== null && quotes.length > 0 && answer && (
                           <div className="pt-1 border-t border-border w-full">
                             <QuotesSection
                               quotes={dedupedQuotes}

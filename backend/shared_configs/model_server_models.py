@@ -25,15 +25,22 @@ class EmbedResponse(BaseModel):
 class RerankRequest(BaseModel):
     query: str
     documents: list[str]
+    model_name: str
+    api_key: str | None
 
 
 class RerankResponse(BaseModel):
-    scores: list[list[float] | None]
+    scores: list[float]
 
 
 class IntentRequest(BaseModel):
     query: str
+    # Sequence classification threshold
+    semantic_percent_threshold: float
+    # Token classification threshold
+    keyword_percent_threshold: float
 
 
 class IntentResponse(BaseModel):
-    class_probs: list[float]
+    is_keyword: bool
+    keywords: list[str]

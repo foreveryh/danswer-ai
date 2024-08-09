@@ -61,7 +61,7 @@ from danswer.search.retrieval.search_runner import inference_sections_from_ids
 from danswer.search.utils import chunks_or_sections_to_search_docs
 from danswer.search.utils import dedupe_documents
 from danswer.search.utils import drop_llm_indices
-from danswer.search.utils import relevant_documents_to_indices
+from danswer.search.utils import relevant_sections_to_indices
 from danswer.server.query_and_chat.models import ChatMessageDetail
 from danswer.server.query_and_chat.models import CreateChatMessageRequest
 from danswer.server.utils import get_json_line
@@ -180,7 +180,7 @@ def _handle_internet_search_tool_response_summary(
             rephrased_query=internet_search_response.revised_query,
             top_documents=response_docs,
             predicted_flow=QueryFlow.QUESTION_ANSWER,
-            predicted_search=SearchType.HYBRID,
+            predicted_search=SearchType.SEMANTIC,
             applied_source_filters=[],
             applied_time_cutoff=None,
             recency_bias_multiplier=1.0,
@@ -637,9 +637,9 @@ def stream_chat_message_objects(
                     relevance_sections = packet.response
 
                     if reference_db_search_docs is not None:
-                        llm_indices = relevant_documents_to_indices(
+                        llm_indices = relevant_sections_to_indices(
                             relevance_sections=relevance_sections,
-                            search_docs=[
+                            items=[
                                 translate_db_search_doc_to_server_search_doc(doc)
                                 for doc in reference_db_search_docs
                             ],
@@ -693,18 +693,28 @@ def stream_chat_message_objects(
                 yield cast(ChatPacket, packet)
 
     except Exception as e:
-        logger.exception("Failed to process chat message")
-
-        # Don't leak the API key
         error_msg = str(e)
-        if llm.config.api_key and llm.config.api_key.lower() in error_msg.lower():
+        logger.exception(f"Failed to process chat message: {error_msg}")
+
+        if "Illegal header value b'Bearer  '" in error_msg:
             error_msg = (
-                f"LLM failed to respond. Invalid API "
-                f"key error from '{llm.config.model_provider}'."
+                f"Authentication error: Invalid or empty API key provided for '{llm.config.model_provider}'. "
+                "Please check your API key configuration."
             )
+        elif (
+            "Invalid leading whitespace, reserved character(s), or return character(s) in header value"
+            in error_msg
+        ):
+            error_msg = (
+                f"Authentication error: Invalid API key format for '{llm.config.model_provider}'. "
+                "Please ensure your API key does not contain leading/trailing whitespace or invalid characters."
+            )
+        elif llm.config.api_key and llm.config.api_key.lower() in error_msg.lower():
+            error_msg = f"LLM failed to respond. Invalid API key error from '{llm.config.model_provider}'."
+        else:
+            error_msg = "An unexpected error occurred while processing your request. Please try again later."
 
         yield StreamingError(error=error_msg)
-        # Cancel the transaction so that no messages are saved
         db_session.rollback()
         return
 

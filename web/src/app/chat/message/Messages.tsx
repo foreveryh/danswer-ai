@@ -1,11 +1,6 @@
 "use client";
 
 import {
-  FiCpu,
-  FiImage,
-  FiThumbsDown,
-  FiThumbsUp,
-  FiUser,
   FiEdit2,
   FiChevronRight,
   FiChevronLeft,
@@ -37,9 +32,6 @@ import { InMessageImage } from "../files/images/InMessageImage";
 import { CodeBlock } from "./CodeBlock";
 import rehypePrism from "rehype-prism-plus";
 
-// Prism stuff
-import Prism from "prismjs";
-
 import "prismjs/themes/prism-tomorrow.css";
 import "./custom-code-styles.css";
 import { Persona } from "@/app/admin/assistants/interfaces";
@@ -59,6 +51,7 @@ import { Tooltip } from "@/components/tooltip/Tooltip";
 import { useMouseTracking } from "./hooks";
 import { InternetSearchIcon } from "@/components/InternetSearchIcon";
 import { SettingsContext } from "@/components/settings/SettingsProvider";
+import GeneratingImageDisplay from "../tools/GeneratingImageDisplay";
 
 const TOOLS_WITH_CUSTOM_HANDLING = [
   SEARCH_TOOL_NAME,
@@ -109,6 +102,7 @@ function FileDisplay({
 }
 
 export const AIMessage = ({
+  shared,
   isActive,
   toggleDocumentSelection,
   alternativeAssistant,
@@ -131,6 +125,7 @@ export const AIMessage = ({
   retrievalDisabled,
   currentPersona,
 }: {
+  shared?: boolean;
   isActive?: boolean;
   selectedDocuments?: DanswerDocument[] | null;
   toggleDocumentSelection?: () => void;
@@ -153,6 +148,7 @@ export const AIMessage = ({
   handleForceSearch?: () => void;
   retrievalDisabled?: boolean;
 }) => {
+  const toolCallGenerating = toolCall && !toolCall.tool_result;
   const processContent = (content: string | JSX.Element) => {
     if (typeof content !== "string") {
       return content;
@@ -168,24 +164,15 @@ export const AIMessage = ({
       }
     }
 
-    return content + (!isComplete ? " [*]() " : "");
+    return content + (!isComplete && !toolCallGenerating ? " [*]() " : "");
   };
 
   const finalContent = processContent(content as string);
-
-  const [isReady, setIsReady] = useState(false);
-  useEffect(() => {
-    Prism.highlightAll();
-    setIsReady(true);
-  }, []);
 
   const { isHovering, trackedElementRef, hoverElementRef } = useMouseTracking();
 
   const settings = useContext(SettingsContext);
   // this is needed to give Prism a chance to load
-  if (!isReady) {
-    return <div />;
-  }
 
   const selectedDocumentIds =
     selectedDocuments?.map((document) => document.document_id) || [];
@@ -245,8 +232,10 @@ export const AIMessage = ({
 
   return (
     <div ref={trackedElementRef} className={"py-5 px-2 lg:px-5 relative flex "}>
-      <div className="mx-auto w-[90%] max-w-message-max">
-        <div className="mobile:ml-4 xl:ml-8">
+      <div
+        className={`mx-auto ${shared ? "w-full" : "w-[90%]"} max-w-message-max`}
+      >
+        <div className={`${!shared && "mobile:ml-4 xl:ml-8"}`}>
           <div className="flex">
             <AssistantIcon
               size="small"
@@ -343,16 +332,9 @@ export const AIMessage = ({
                       )}
 
                     {toolCall &&
+                      (!files || files.length == 0) &&
                       toolCall.tool_name === IMAGE_GENERATION_TOOL_NAME &&
-                      !toolCall.tool_result && (
-                        <ToolRunDisplay
-                          toolName={`Generating images`}
-                          toolLogo={
-                            <FiImage size={15} className="my-auto mr-1" />
-                          }
-                          isRunning={!toolCall.tool_result}
-                        />
-                      )}
+                      !toolCall.tool_result && <GeneratingImageDisplay />}
 
                     {toolCall &&
                       toolCall.tool_name === INTERNET_SEARCH_TOOL_NAME && (
@@ -369,7 +351,7 @@ export const AIMessage = ({
                         />
                       )}
 
-                    {content ? (
+                    {content || files ? (
                       <>
                         <FileDisplay files={files || []} />
 
@@ -628,7 +610,9 @@ export const HumanMessage = ({
   otherMessagesCanSwitchTo,
   onEdit,
   onMessageSelection,
+  shared,
 }: {
+  shared?: boolean;
   content: string;
   files?: FileDescriptor[];
   messageId?: number | null;
@@ -675,7 +659,9 @@ export const HumanMessage = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="mx-auto w-[90%] max-w-searchbar-max">
+      <div
+        className={`mx-auto ${shared ? "w-full" : "w-[90%]"} max-w-searchbar-max`}
+      >
         <div className="xl:ml-8">
           <div className="flex flex-col mr-4">
             <FileDisplay alignBubble files={files || []} />

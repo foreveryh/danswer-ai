@@ -600,6 +600,75 @@ export const BackIcon = ({
   );
 };
 
+export const MagnifyingIcon = ({
+  size = 16,
+  className = defaultTailwindCSS,
+}: IconProps) => {
+  return (
+    <svg
+      style={{ width: `${size}px`, height: `${size}px` }}
+      className={`w-[${size}px] h-[${size}px] ` + className}
+      xmlns="http://www.w3.org/2000/svg"
+      width="200"
+      height="200"
+      viewBox="0 0 16 16"
+    >
+      <path
+        fill="currentColor"
+        fill-rule="evenodd"
+        d="M9.965 11.026a5 5 0 1 1 1.06-1.06l2.755 2.754a.75.75 0 1 1-1.06 1.06zM10.5 7a3.5 3.5 0 1 1-7 0a3.5 3.5 0 0 1 7 0"
+        clip-rule="evenodd"
+      />
+    </svg>
+  );
+};
+
+export const ToggleDown = ({
+  size = 16,
+  className = defaultTailwindCSS,
+}: IconProps) => {
+  return (
+    <svg
+      style={{ width: `${size}px`, height: `${size}px` }}
+      className={`w-[${size}px] h-[${size}px] ` + className}
+      xmlns="http://www.w3.org/2000/svg"
+      width="200"
+      height="200"
+      viewBox="0 0 16 16"
+    >
+      <path
+        fill="currentColor"
+        fill-rule="evenodd"
+        d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06"
+        clip-rule="evenodd"
+      />
+    </svg>
+  );
+};
+
+export const ToggleUp = ({
+  size = 16,
+  className = defaultTailwindCSS,
+}: IconProps) => {
+  return (
+    <svg
+      style={{ width: `${size}px`, height: `${size}px` }}
+      className={`w-[${size}px] h-[${size}px] ` + className}
+      xmlns="http://www.w3.org/2000/svg"
+      width="200"
+      height="200"
+      viewBox="0 0 16 16"
+    >
+      <path
+        fill="currentColor"
+        fill-rule="evenodd"
+        d="M11.78 9.78a.75.75 0 0 1-1.06 0L8 7.06L5.28 9.78a.75.75 0 0 1-1.06-1.06l3.25-3.25a.75.75 0 0 1 1.06 0l3.25 3.25a.75.75 0 0 1 0 1.06"
+        clip-rule="evenodd"
+      />
+    </svg>
+  );
+};
+
 export const BroomIcon = ({
   size = 16,
   className = defaultTailwindCSS,
@@ -2289,6 +2358,28 @@ export const NewChatIcon = ({
         />
         <path d="m16.652 3.455l.649-.649A2.753 2.753 0 0 1 21.194 6.7l-.65.649m-3.892-3.893s.081 1.379 1.298 2.595c1.216 1.217 2.595 1.298 2.595 1.298m-3.893-3.893L10.687 9.42c-.404.404-.606.606-.78.829c-.205.262-.38.547-.524.848c-.121.255-.211.526-.392 1.068L8.412 13.9m12.133-6.552l-5.965 5.965c-.404.404-.606.606-.829.78a4.59 4.59 0 0 1-.848.524c-.255.121-.526.211-1.068.392l-1.735.579m0 0l-1.123.374a.742.742 0 0 1-.939-.94l.374-1.122m1.688 1.688L8.412 13.9" />
       </g>
+    </svg>
+  );
+};
+
+export const ImageIcon = ({
+  size = 16,
+  className = defaultTailwindCSS,
+}: IconProps) => {
+  return (
+    <svg
+      style={{ width: `${size}px`, height: `${size}px` }}
+      className={`w-[${size}px] h-[${size}px] ` + className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+      />
     </svg>
   );
 };

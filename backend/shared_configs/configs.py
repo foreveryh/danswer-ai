@@ -14,8 +14,8 @@ INDEXING_MODEL_SERVER_PORT = int(
 )
 
 # Danswer custom Deep Learning Models
-INTENT_MODEL_VERSION = "danswer/intent-model"
-INTENT_MODEL_CONTEXT_SIZE = 256
+INTENT_MODEL_VERSION = "danswer/hybrid-intent-token-classifier"
+INTENT_MODEL_TAG = "v1.0.3"
 
 # Bi-Encoder, other details
 DOC_EMBEDDING_CONTEXT_SIZE = 512
@@ -27,9 +27,8 @@ ENABLE_RERANKING_ASYNC_FLOW = (
 ENABLE_RERANKING_REAL_TIME_FLOW = (
     os.environ.get("ENABLE_RERANKING_REAL_TIME_FLOW", "").lower() == "true"
 )
-# Only using one cross-encoder for now
-CROSS_ENCODER_MODEL_ENSEMBLE = ["mixedbread-ai/mxbai-rerank-xsmall-v1"]
-CROSS_EMBED_CONTEXT_SIZE = 512
+
+DEFAULT_CROSS_ENCODER_MODEL_NAME = "mixedbread-ai/mxbai-rerank-xsmall-v1"
 
 # This controls the minimum number of pytorch "threads" to allocate to the embedding
 # model. If torch finds more threads on its own, this value is not used.

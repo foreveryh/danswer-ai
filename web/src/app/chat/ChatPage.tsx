@@ -15,8 +15,8 @@ import {
   ToolCallMetadata,
 } from "./interfaces";
 
+import Prism from "prismjs";
 import Cookies from "js-cookie";
-
 import { HistorySidebar } from "./sessionSidebar/HistorySidebar";
 import { Persona } from "../admin/assistants/interfaces";
 import { HealthCheckBanner } from "@/components/health/healthcheck";
@@ -45,7 +45,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { usePopup } from "@/components/admin/connectors/Popup";
 import { SEARCH_PARAM_NAMES, shouldSubmitOnLoad } from "./searchParams";
 import { useDocumentSelection } from "./useDocumentSelection";
-import { useFilters, useLlmOverride } from "@/lib/hooks";
+import { LlmOverride, useFilters, useLlmOverride } from "@/lib/hooks";
 import { computeAvailableFilters } from "@/lib/filters";
 import { FeedbackType } from "./types";
 import { DocumentSidebar } from "./documentSidebar/DocumentSidebar";
@@ -60,19 +60,26 @@ import { AnswerPiecePacket, DanswerDocument } from "@/lib/search/interfaces";
 import { buildFilters } from "@/lib/search/utils";
 import { SettingsContext } from "@/components/settings/SettingsProvider";
 import Dropzone from "react-dropzone";
-import { checkLLMSupportsImageInput, getFinalLLM } from "@/lib/llm/utils";
+import {
+  checkLLMSupportsImageInput,
+  getFinalLLM,
+  getLLMProviderOverrideForPersona,
+} from "@/lib/llm/utils";
 import { ChatInputBar } from "./input/ChatInputBar";
 import { useChatContext } from "@/components/context/ChatContext";
 import { v4 as uuidv4 } from "uuid";
 import { orderAssistantsForUser } from "@/lib/assistants/orderAssistants";
 import { ChatPopup } from "./ChatPopup";
-import { ChatBanner } from "./ChatBanner";
 
 import FunctionalHeader from "@/components/chat_search/Header";
 import { useSidebarVisibility } from "@/components/chat_search/hooks";
 import { SIDEBAR_TOGGLED_COOKIE_NAME } from "@/components/resizable/constants";
 import FixedLogo from "./shared_chat_search/FixedLogo";
 import { getSecondsUntilExpiration } from "@/lib/time";
+import {
+  FullLLMProvider,
+  LLMProviderDescriptor,
+} from "../admin/models/llm/interfaces";
 
 const TEMP_USER_MESSAGE_ID = -1;
 const TEMP_ASSISTANT_MESSAGE_ID = -2;
@@ -112,10 +119,12 @@ export function ChatPage({
   const selectedChatSession = chatSessions.find(
     (chatSession) => chatSession.id === existingChatSessionId
   );
+
   const chatSessionIdRef = useRef<number | null>(existingChatSessionId);
 
-  // LLM
-  const llmOverrideManager = useLlmOverride(selectedChatSession);
+  // Only updates on session load (ie. rename / switching chat session)
+  // Useful for determining which session has been loaded (i.e. still on `new, empty session` or `previous session`)
+  const loadedIdSessionRef = useRef<number | null>(existingChatSessionId);
 
   // Assistants
   const filteredAssistants = orderAssistantsForUser(availableAssistants, user);
@@ -137,6 +146,21 @@ export function ChatPage({
           )
         : undefined
   );
+
+  // Gather default temperature settings
+  const search_param_temperature = searchParams.get(
+    SEARCH_PARAM_NAMES.TEMPERATURE
+  );
+  const defaultTemperature = search_param_temperature
+    ? parseFloat(search_param_temperature)
+    : selectedAssistant?.tools.some(
+          (tool) =>
+            tool.in_code_tool_id === "SearchTool" ||
+            tool.in_code_tool_id === "InternetSearchTool"
+        )
+      ? 0
+      : 0.7;
+
   const setSelectedAssistantFromId = (assistantId: number) => {
     // NOTE: also intentionally look through available assistants here, so that
     // even if the user has hidden an assistant they can still go back to it
@@ -147,6 +171,22 @@ export function ChatPage({
   };
   const liveAssistant =
     selectedAssistant || filteredAssistants[0] || availableAssistants[0];
+
+  const llmOverrideManager = useLlmOverride(
+    selectedChatSession,
+    defaultTemperature
+  );
+
+  useEffect(() => {
+    const personaDefault = getLLMProviderOverrideForPersona(
+      liveAssistant,
+      llmProviders
+    );
+
+    if (personaDefault) {
+      llmOverrideManager.setLlmOverride(personaDefault);
+    }
+  }, [liveAssistant]);
 
   // this is for "@"ing assistants
   const [alternativeAssistant, setAlternativeAssistant] =
@@ -173,11 +213,20 @@ export function ChatPage({
     existingChatSessionId !== null
   );
 
+  const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    Prism.highlightAll();
+    setIsReady(true);
+  }, []);
+
   // this is triggered every time the user switches which chat
   // session they are using
   useEffect(() => {
     const priorChatSessionId = chatSessionIdRef.current;
+    const loadedSessionId = loadedIdSessionRef.current;
     chatSessionIdRef.current = existingChatSessionId;
+    loadedIdSessionRef.current = existingChatSessionId;
+
     textAreaRef.current?.focus();
 
     // only clear things if we're going from one chat session to another
@@ -243,8 +292,15 @@ export function ChatPage({
 
       const newMessageMap = processRawChatHistory(chatSession.messages);
       const newMessageHistory = buildLatestMessageChain(newMessageMap);
-      // if the last message is an error, don't overwrite it
-      if (messageHistory[messageHistory.length - 1]?.type !== "error") {
+
+      // Update message history except for edge where where
+      // last message is an error and we're on a new chat.
+      // This corresponds to a "renaming" of chat, which occurs after first message
+      // stream
+      if (
+        messageHistory[messageHistory.length - 1]?.type !== "error" ||
+        loadedSessionId != null
+      ) {
         setCompleteMessageDetail({
           sessionId: chatSession.chat_session_id,
           messageMap: newMessageMap,
@@ -376,6 +432,8 @@ export function ChatPage({
     completeMessageDetail.messageMap
   );
   const [isStreaming, setIsStreaming] = useState(false);
+  const [abortController, setAbortController] =
+    useState<AbortController | null>(null);
 
   // uploaded files
   const [currentMessageFiles, setCurrentMessageFiles] = useState<
@@ -578,18 +636,30 @@ export function ChatPage({
       return this.stack.length === 0;
     }
   }
+
   async function updateCurrentMessageFIFO(
     stack: CurrentMessageFIFO,
     params: any
   ) {
     try {
       for await (const packetBunch of sendMessage(params)) {
+        if (params.signal?.aborted) {
+          throw new Error("AbortError");
+        }
         for (const packet of packetBunch) {
           stack.push(packet);
         }
       }
-    } catch (error) {
-      stack.error = String(error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          console.debug("Stream aborted");
+        } else {
+          stack.error = error.message;
+        }
+      } else {
+        stack.error = String(error);
+      }
     } finally {
       stack.isComplete = true;
     }
@@ -626,6 +696,9 @@ export function ChatPage({
 
       return;
     }
+
+    const controller = new AbortController();
+    setAbortController(controller);
 
     setAlternativeGeneratingAssistant(alternativeAssistantOverride);
     clientScrollToBottom();
@@ -716,7 +789,7 @@ export function ChatPage({
 
     const currentAssistantId = alternativeAssistantOverride
       ? alternativeAssistantOverride.id
-      : alternativeAssistant?.id || liveAssistant.id;
+      : (alternativeAssistant?.id ?? liveAssistant.id);
 
     resetInputBar();
 
@@ -739,6 +812,8 @@ export function ChatPage({
 
       const stack = new CurrentMessageFIFO();
       updateCurrentMessageFIFO(stack, {
+        signal: controller.signal, // Add this line
+
         message: currMessage,
         alternateAssistantId: currentAssistantId,
         fileDescriptors: currentMessageFiles,
@@ -765,10 +840,7 @@ export function ChatPage({
           llmOverrideManager.llmOverride.modelName ||
           searchParams.get(SEARCH_PARAM_NAMES.MODEL_VERSION) ||
           undefined,
-        temperature:
-          llmOverrideManager.temperature ||
-          parseFloat(searchParams.get(SEARCH_PARAM_NAMES.TEMPERATURE) || "") ||
-          undefined,
+        temperature: llmOverrideManager.temperature || undefined,
         systemPromptOverride:
           searchParams.get(SEARCH_PARAM_NAMES.SYSTEM_PROMPT) || undefined,
         useExistingUserMessage: isSeededChat,
@@ -954,9 +1026,12 @@ export function ChatPage({
 
   const onAssistantChange = (assistant: Persona | null) => {
     if (assistant && assistant.id !== liveAssistant.id) {
-      // remove uploaded files
-      setCurrentMessageFiles([]);
-      setSelectedAssistant(assistant);
+      // Abort the ongoing stream if it exists
+      if (abortController && isStreaming) {
+        abortController.abort();
+        resetInputBar();
+      }
+
       textAreaRef.current?.focus();
       router.push(buildChatUrl(searchParams, null, assistant.id));
     }
@@ -1192,6 +1267,7 @@ export function ChatPage({
             <div className="flex h-full flex-col w-full">
               {liveAssistant && (
                 <FunctionalHeader
+                  sidebarToggled={toggledSidebar}
                   reset={() => setMessage("")}
                   page="chat"
                   setSharingModalVisible={
@@ -1204,24 +1280,8 @@ export function ChatPage({
                   currentChatSession={selectedChatSession}
                 />
               )}
-              <div className="w-full flex">
-                <div
-                  style={{ transition: "width 0.30s ease-out" }}
-                  className={`
-                  flex-none 
-                  overflow-y-hidden 
-                  bg-background-100 
-                  transition-all 
-                  bg-opacity-80
-                  duration-300 
-                  ease-in-out
-                  h-full
-                  ${toggledSidebar ? "w-[250px]" : "w-[0px]"}
-                  `}
-                />
-                <ChatBanner />
-              </div>
-              {documentSidebarInitialWidth !== undefined ? (
+
+              {documentSidebarInitialWidth !== undefined && isReady ? (
                 <Dropzone onDrop={handleImageUpload} noClick>
                   {({ getRootProps }) => (
                     <div className="flex h-full w-full">
@@ -1229,21 +1289,21 @@ export function ChatPage({
                         <div
                           style={{ transition: "width 0.30s ease-out" }}
                           className={`
-                        flex-none 
-                        overflow-y-hidden 
-                        bg-background-100 
-                        transition-all 
-                        bg-opacity-80
-                        duration-300 
-                        ease-in-out
-                        h-full
-                        ${toggledSidebar ? "w-[250px]" : "w-[0px]"}
+                          flex-none 
+                          overflow-y-hidden 
+                          bg-background-100 
+                          transition-all 
+                          bg-opacity-80
+                          duration-300 
+                          ease-in-out
+                          h-full
+                          ${toggledSidebar ? "w-[250px]" : "w-[0px]"}
                       `}
                         ></div>
                       )}
 
                       <div
-                        className={`h-full w-full relative flex-auto transition-margin duration-300 overflow-x-auto mobile:pb-12 desktop:pb-[140px]`}
+                        className={`h-full w-full relative flex-auto transition-margin duration-300 overflow-x-auto mobile:pb-12 desktop:pb-[100px]`}
                         {...getRootProps()}
                       >
                         {/* <input {...getInputProps()} /> */}
@@ -1533,18 +1593,18 @@ export function ChatPage({
                               !isFetchingChatMessages && (
                                 <div
                                   className={`
-                            mx-auto 
-                            px-4 
-                            w-searchbar-xs 
-                            2xl:w-searchbar-sm 
-                            3xl:w-searchbar 
-                            grid 
-                            gap-4 
-                            grid-cols-1 
-                            grid-rows-1 
-                            mt-4 
-                            md:grid-cols-2 
-                            mb-6`}
+                                      mx-auto 
+                                      px-4 
+                                      w-searchbar-xs 
+                                      2xl:w-searchbar-sm 
+                                      3xl:w-searchbar 
+                                      grid 
+                                      gap-4 
+                                      grid-cols-1 
+                                      grid-rows-1 
+                                      mt-4 
+                                      md:grid-cols-2 
+                                      mb-6`}
                                 >
                                   {currentPersona.starter_messages.map(
                                     (starterMessage, i) => (

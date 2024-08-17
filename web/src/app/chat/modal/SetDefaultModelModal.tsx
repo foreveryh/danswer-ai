@@ -1,13 +1,9 @@
-import { Dispatch, SetStateAction, useState } from "react";
+import { Dispatch, SetStateAction } from "react";
 import { ModalWrapper } from "./ModalWrapper";
 import { Badge, Text } from "@tremor/react";
-import {
-  getDisplayNameForModel,
-  LlmOverride,
-  LlmOverrideManager,
-  useLlmOverride,
-} from "@/lib/hooks";
-import { LLMProviderDescriptor } from "@/app/admin/models/llm/interfaces";
+import { getDisplayNameForModel, LlmOverride } from "@/lib/hooks";
+import { LLMProviderDescriptor } from "@/app/admin/configuration/llm/interfaces";
+
 import { destructureValue, structureValue } from "@/lib/llm/utils";
 import { setUserDefaultModel } from "@/lib/users/UserSettings";
 import { useRouter } from "next/navigation";
@@ -98,6 +94,9 @@ export function SetDefaultModelModal({
       });
     }
   };
+  const defaultProvider = llmProviders.find(
+    (llmProvider) => llmProvider.is_default_provider
+  );
 
   return (
     <ModalWrapper
@@ -118,46 +117,46 @@ export function SetDefaultModelModal({
           {defaultModel == null && "  No default model has been selected!"}
         </Text>
         <div className="w-full flex text-sm flex-col">
-          <div key={-1} className="w-full border-b hover:bg-background-50">
-            <td className="min-w-[80px]">
-              {defaultModel == null ? (
-                <Badge>selected</Badge>
-              ) : (
-                <input
-                  type="radio"
-                  name="credentialSelection"
-                  onChange={(e) => {
-                    e.preventDefault();
-                    handleChangedefaultModel(null);
-                  }}
-                  className="form-radio ml-4 h-4 w-4 text-blue-600 transition duration-150 ease-in-out"
-                />
-              )}
-            </td>
-            <td className="p-2">System default</td>
+          <div
+            key={-1}
+            className="w-full border-b flex items-center gap-x-2 hover:bg-background-50"
+          >
+            <input
+              checked={defaultModelDestructured?.modelName == null}
+              type="radio"
+              name="credentialSelection"
+              onChange={(e) => {
+                e.preventDefault();
+                handleChangedefaultModel(null);
+              }}
+              className="form-radio ml-4 h-4 w-4 text-blue-600 transition duration-150 ease-in-out"
+            />
+            {
+              <td className="p-2">
+                System default{" "}
+                {defaultProvider?.default_model_name &&
+                  `(${getDisplayNameForModel(defaultProvider?.default_model_name)})`}
+              </td>
+            }
           </div>
 
           {llmOptions.map(({ name, value }, index) => {
             return (
               <div
                 key={index}
-                className="w-full border-b hover:bg-background-50"
+                className="w-full flex items-center gap-x-2 border-b hover:bg-background-50"
               >
-                <td className="min-w-[80px]">
-                  {defaultModelDestructured?.modelName != name ? (
-                    <input
-                      type="radio"
-                      name="credentialSelection"
-                      onChange={(e) => {
-                        e.preventDefault();
-                        handleChangedefaultModel(value);
-                      }}
-                      className="form-radio ml-4 h-4 w-4 text-blue-600 transition duration-150 ease-in-out"
-                    />
-                  ) : (
-                    <Badge>selected</Badge>
-                  )}
-                </td>
+                <input
+                  checked={defaultModelDestructured?.modelName == name}
+                  type="radio"
+                  name="credentialSelection"
+                  onChange={(e) => {
+                    e.preventDefault();
+                    handleChangedefaultModel(value);
+                  }}
+                  className="form-radio ml-4 h-4 w-4 text-blue-600 transition duration-150 ease-in-out"
+                />
+
                 <td className="p-2">
                   {getDisplayNameForModel(name)}{" "}
                   {defaultModelDestructured &&

@@ -512,6 +512,18 @@ export const SearchSection = ({
   const [firstSearch, setFirstSearch] = useState(true);
   const [searchState, setSearchState] = useState<searchState>("input");
 
+  // Used to maintain a "time out" for history sidebar so our existing refs can have time to process change
+  const [untoggled, setUntoggled] = useState(false);
+
+  const explicitlyUntoggle = () => {
+    setShowDocSidebar(false);
+
+    setUntoggled(true);
+    setTimeout(() => {
+      setUntoggled(false);
+    }, 200);
+  };
+
   useSidebarVisibility({
     toggledSidebar,
     sidebarElementRef,
@@ -600,7 +612,7 @@ export const SearchSection = ({
             duration-300 
             ease-in-out
             ${
-              showDocSidebar || toggledSidebar
+              !untoggled && (showDocSidebar || toggledSidebar)
                 ? "opacity-100 w-[250px] translate-x-0"
                 : "opacity-0 w-[200px] pointer-events-none -translate-x-10"
             }
@@ -608,6 +620,7 @@ export const SearchSection = ({
         >
           <div className="w-full relative">
             <HistorySidebar
+              explicitlyUntoggle={explicitlyUntoggle}
               reset={() => setQuery("")}
               page="search"
               ref={innerSidebarElementRef}
@@ -646,7 +659,7 @@ export const SearchSection = ({
               <div
                 className={`desktop:px-24 w-full ${chatBannerPresent && "mt-10"} pt-10 relative max-w-[2000px] xl:max-w-[1430px] mx-auto`}
               >
-                <div className="absolute z-10 mobile:px-4 mobile:max-w-searchbar-max mobile:w-[90%] top-12 desktop:left-0 hidden 2xl:block mobile:left-1/2 mobile:transform mobile:-translate-x-1/2 desktop:w-52 3xl:w-64">
+                <div className="absolute z-10 mobile:px-4 mobile:max-w-searchbar-max mobile:w-[90%] top-12 desktop:left-4 hidden 2xl:block mobile:left-1/2 mobile:transform mobile:-translate-x-1/2 desktop:w-52 3xl:w-64">
                   {!settings?.isMobile &&
                     (ccPairs.length > 0 || documentSets.length > 0) && (
                       <SourceSelector

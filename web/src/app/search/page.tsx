@@ -49,7 +49,7 @@ export default async function Home() {
     fetchSS("/manage/document-set"),
     fetchAssistantsSS(),
     fetchSS("/query/valid-tags"),
-    fetchSS("/search-settings/get-embedding-models"),
+    fetchSS("/search-settings/get-all-search-settings"),
     fetchSS("/query/user-searches"),
   ];
 
@@ -185,6 +185,7 @@ export default async function Home() {
     <>
       <HealthCheckBanner secondsUntilExpiration={secondsUntilExpiration} />
       {shouldShowWelcomeModal && <WelcomeModal user={user} />}
+      <InstantSSRAutoRefresh />
 
       {!shouldShowWelcomeModal &&
         !shouldDisplayNoSourcesModal &&
@@ -200,7 +201,6 @@ export default async function Home() {
       Only used in the EE version of the app. */}
       <ChatPopup />
 
-      <InstantSSRAutoRefresh />
       <WrappedSearch
         disabledAgentic={DISABLE_LLM_DOC_RELEVANCE}
         initiallyToggled={toggleSidebar}

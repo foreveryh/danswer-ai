@@ -14,7 +14,12 @@ export enum UserStatus {
   deactivated = "deactivated",
 }
 
-export type UserRole = "basic" | "admin";
+export enum UserRole {
+  BASIC = "basic",
+  ADMIN = "admin",
+  CURATOR = "curator",
+  GLOBAL_CURATOR = "global_curator",
+}
 
 export interface User {
   id: string;
@@ -38,6 +43,7 @@ export interface MinimalUserSnapshot {
 export type ValidInputTypes = "load_state" | "poll" | "event";
 export type ValidStatuses =
   | "success"
+  | "completed_with_errors"
   | "failed"
   | "in_progress"
   | "not_started";
@@ -59,6 +65,7 @@ export interface IndexAttemptSnapshot {
   docs_removed_from_index: number;
   total_docs_indexed: number;
   error_msg: string | null;
+  error_count: number;
   full_exception_trace: string | null;
   time_started: string | null;
   time_updated: string;
@@ -75,6 +82,7 @@ export interface ConnectorIndexingStatus<
   credential: Credential<ConnectorCredentialType>;
   public_doc: boolean;
   owner: string;
+  groups: number[];
   last_finished_status: ValidStatuses | null;
   last_status: ValidStatuses | null;
   last_success: string | null;
@@ -183,6 +191,7 @@ export interface UserGroup {
   id: number;
   name: string;
   users: User[];
+  curator_ids: string[];
   cc_pairs: CCPairDescriptor<any, any>[];
   document_sets: DocumentSet[];
   personas: Persona[];

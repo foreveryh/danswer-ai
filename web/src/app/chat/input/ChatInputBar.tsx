@@ -21,6 +21,7 @@ import {
   CpuIconSkeleton,
   FileIcon,
   SendIcon,
+  StopGeneratingIcon,
 } from "@/components/icons/icons";
 import { IconType } from "react-icons";
 import Popup from "../../../components/popup/Popup";
@@ -31,6 +32,8 @@ import { AssistantIcon } from "@/components/assistants/AssistantIcon";
 import { Tooltip } from "@/components/tooltip/Tooltip";
 import { Hoverable } from "@/components/Hoverable";
 import { SettingsContext } from "@/components/settings/SettingsProvider";
+import { ChatState } from "../types";
+
 const MAX_INPUT_HEIGHT = 200;
 
 export function ChatInputBar({
@@ -39,10 +42,11 @@ export function ChatInputBar({
   selectedDocuments,
   message,
   setMessage,
+  stopGenerating,
   onSubmit,
-  isStreaming,
   filterManager,
   llmOverrideManager,
+  chatState,
 
   // assistants
   selectedAssistant,
@@ -59,6 +63,8 @@ export function ChatInputBar({
   inputPrompts,
 }: {
   openModelSettings: () => void;
+  chatState: ChatState;
+  stopGenerating: () => void;
   showDocs: () => void;
   selectedDocuments: DanswerDocument[];
   assistantOptions: Persona[];
@@ -68,7 +74,6 @@ export function ChatInputBar({
   message: string;
   setMessage: (message: string) => void;
   onSubmit: () => void;
-  isStreaming: boolean;
   filterManager: FilterManager;
   llmOverrideManager: LlmOverrideManager;
   selectedAssistant: Persona;
@@ -267,13 +272,11 @@ export function ChatInputBar({
   };
 
   return (
-    <div>
-      <div className="flex justify-center max-w-screen-lg mx-auto">
+    <div id="danswer-chat-input">
+      <div className="flex justify-center mx-auto">
         <div
           className="
-            w-[90%]
-            max-w-searchbar-max
-            shrink
+            w-[800px]
             relative
             desktop:px-4
             mx-auto
@@ -335,7 +338,7 @@ export function ChatInputBar({
                       updateInputPrompt(currentPrompt);
                     }}
                   >
-                    <p className="font-bold ">{currentPrompt.prompt}</p>
+                    <p className="font-bold">{currentPrompt.prompt}</p>
                     <p className="line-clamp-1">
                       {currentPrompt.id == selectedAssistant.id && "(default) "}
                       {currentPrompt.content}
@@ -480,8 +483,7 @@ export function ChatInputBar({
                 outline-none
                 placeholder-subtle
                 resize-none
-                pl-4
-                pr-12
+                px-5
                 py-4
                 h-14
               `}
@@ -509,7 +511,7 @@ export function ChatInputBar({
               }}
               suppressContentEditableWarning={true}
             />
-            <div className="flex items-center space-x-3 mr-12 px-4 pb-2 ">
+            <div className="flex items-center space-x-3 mr-12 px-4 pb-2">
               <Popup
                 removePadding
                 content={(close) => (
@@ -553,7 +555,6 @@ export function ChatInputBar({
                     ref={ref}
                     llmOverrideManager={llmOverrideManager}
                     chatSessionId={chatSessionId}
-                    currentAssistant={selectedAssistant}
                   />
                 )}
                 position="top"
@@ -597,24 +598,38 @@ export function ChatInputBar({
                 }}
               />
             </div>
+
             <div className="absolute bottom-2.5 mobile:right-4 desktop:right-10">
-              <div
-                className="cursor-pointer"
-                onClick={() => {
-                  if (message) {
-                    onSubmit();
-                  }
-                }}
-              >
-                <SendIcon
-                  size={28}
-                  className={`text-emphasis text-white p-1 rounded-full ${
-                    message && !isStreaming
-                      ? "bg-background-800"
-                      : "bg-[#D7D7D7]"
-                  }`}
-                />
-              </div>
+              {chatState == "streaming" ||
+              chatState == "toolBuilding" ||
+              chatState == "loading" ? (
+                <button
+                  className={`cursor-pointer ${chatState != "streaming" ? "bg-background-400" : "bg-background-800"}  h-[28px] w-[28px] rounded-full`}
+                  onClick={stopGenerating}
+                  disabled={chatState != "streaming"}
+                >
+                  <StopGeneratingIcon
+                    size={10}
+                    className={`text-emphasis m-auto text-white flex-none
+                      }`}
+                  />
+                </button>
+              ) : (
+                <button
+                  className="cursor-pointer"
+                  onClick={() => {
+                    if (message) {
+                      onSubmit();
+                    }
+                  }}
+                  disabled={chatState != "input"}
+                >
+                  <SendIcon
+                    size={28}
+                    className={`text-emphasis text-white p-1 rounded-full  ${chatState == "input" && message ? "bg-background-800" : "bg-background-400"} `}
+                  />
+                </button>
+              )}
             </div>
           </div>
         </div>

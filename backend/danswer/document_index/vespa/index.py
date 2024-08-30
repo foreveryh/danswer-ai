@@ -366,7 +366,7 @@ class VespaIndex(DocumentIndex):
                     )
 
         self._apply_updates_batched(processed_updates_requests)
-        logger.info(
+        logger.debug(
             "Finished updating Vespa documents in %.2f seconds",
             time.monotonic() - update_start,
         )
@@ -434,6 +434,8 @@ class VespaIndex(DocumentIndex):
         )
 
         final_query = " ".join(final_keywords) if final_keywords else query
+
+        logger.debug(f"Query YQL: {yql}")
 
         params: dict[str, str | int | float] = {
             "yql": yql,

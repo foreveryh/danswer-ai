@@ -50,7 +50,7 @@ def get_google_drive_creds_for_authorized_user(
         try:
             creds.refresh(Request())
             if creds.valid:
-                logger.info("Refreshed Google Drive tokens.")
+                logger.notice("Refreshed Google Drive tokens.")
                 return creds
         except Exception as e:
             logger.exception(f"Failed to refresh google drive access token due to: {e}")
@@ -106,7 +106,7 @@ def update_credential_access_tokens(
 ) -> OAuthCredentials | None:
     app_credentials = get_google_app_cred()
     flow = InstalledAppFlow.from_client_config(
-        app_credentials.dict(),
+        app_credentials.model_dump(),
         scopes=SCOPES,
         redirect_uri=_build_frontend_google_drive_redirect(),
     )

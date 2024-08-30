@@ -1,3 +1,4 @@
+from enum import auto
 from enum import Enum
 
 SOURCE_TYPE = "source_type"
@@ -11,7 +12,6 @@ PUBLIC_DOC_PAT = "PUBLIC"
 ID_SEPARATOR = ":;:"
 DEFAULT_BOOST = 0
 SESSION_KEY = "session"
-
 
 # For chunking/processing chunks
 RETURN_SEPARATOR = "\n\r\n"
@@ -163,3 +163,7 @@ class FileOrigin(str, Enum):
     CONNECTOR = "connector"
     GENERATED_REPORT = "generated_report"
     OTHER = "other"
+
+
+class PostgresAdvisoryLocks(Enum):
+    KOMBU_MESSAGE_CLEANUP_LOCK_ID = auto()

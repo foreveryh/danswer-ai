@@ -18,11 +18,11 @@ import {
 } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import {
-  FiCheck,
   FiChevronDown,
   FiChevronRight,
   FiSettings,
-  FiXCircle,
+  FiLock,
+  FiUnlock,
 } from "react-icons/fi";
 import { Tooltip } from "@/components/tooltip/Tooltip";
 import { SourceIcon } from "@/components/SourceIcon";
@@ -61,7 +61,7 @@ function SummaryRow({
   return (
     <TableRow
       onClick={onToggle}
-      className="border-border bg-white rounded-sm !border sbg-white cursor-pointer"
+      className="border-border bg-white rounded-sm !border cursor-pointer"
     >
       <TableCell className={`py-4 w-[${columnWidths.first}]`}>
         <div className="text-xl flex items-center truncate ellipsis gap-x-2 font-semibold">
@@ -134,9 +134,11 @@ function SummaryRow({
 function ConnectorRow({
   ccPairsIndexingStatus,
   invisible,
+  isEditable,
 }: {
   ccPairsIndexingStatus: ConnectorIndexingStatus<any, any>;
   invisible?: boolean;
+  isEditable: boolean;
 }) {
   const router = useRouter();
   const isPaidEnterpriseFeaturesEnabled = usePaidEnterpriseFeaturesEnabled();
@@ -225,9 +227,9 @@ function ConnectorRow({
       className={`hover:bg-hover-light ${
         invisible ? "invisible h-0 !-mb-10" : "border border-border !border-b"
       }  w-full cursor-pointer relative`}
-      onClick={() =>
-        router.push(`/admin/connector/${ccPairsIndexingStatus.cc_pair_id}`)
-      }
+      onClick={() => {
+        router.push(`/admin/connector/${ccPairsIndexingStatus.cc_pair_id}`);
+      }}
     >
       <TableCell className={`!pr-0 w-[${columnWidths.first}]`}>
         <p className="w-[200px] inline-block ellipsis truncate">
@@ -243,9 +245,17 @@ function ConnectorRow({
       {isPaidEnterpriseFeaturesEnabled && (
         <TableCell className={`w-[${columnWidths.fourth}]`}>
           {ccPairsIndexingStatus.public_doc ? (
-            <FiCheck className="my-auto text-emerald-600" size="18" />
+            <Badge
+              size="md"
+              color={isEditable ? "green" : "gray"}
+              icon={FiUnlock}
+            >
+              Public
+            </Badge>
           ) : (
-            <FiXCircle className="my-auto text-red-600" />
+            <Badge size="md" color={isEditable ? "blue" : "gray"} icon={FiLock}>
+              Private
+            </Badge>
           )}
         </TableCell>
       )}
@@ -260,9 +270,14 @@ function ConnectorRow({
         />
       </TableCell>
       <TableCell className={`w-[${columnWidths.seventh}]`}>
-        <CustomTooltip content="Manage Connector">
-          <FiSettings className="cursor-pointer" onClick={handleManageClick} />
-        </CustomTooltip>
+        {isEditable && (
+          <CustomTooltip content="Manage Connector">
+            <FiSettings
+              className="cursor-pointer"
+              onClick={handleManageClick}
+            />
+          </CustomTooltip>
+        )}
       </TableCell>
     </TableRow>
   );
@@ -270,8 +285,10 @@ function ConnectorRow({
 
 export function CCPairIndexingStatusTable({
   ccPairsIndexingStatuses,
+  editableCcPairsIndexingStatuses,
 }: {
   ccPairsIndexingStatuses: ConnectorIndexingStatus<any, any>[];
+  editableCcPairsIndexingStatuses: ConnectorIndexingStatus<any, any>[];
 }) {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -294,12 +311,29 @@ export function CCPairIndexingStatusTable({
   const { groupedStatuses, sortedSources, groupSummaries } = useMemo(() => {
     const grouped: Record<ValidSources, ConnectorIndexingStatus<any, any>[]> =
       {} as Record<ValidSources, ConnectorIndexingStatus<any, any>[]>;
+
+    // First, add editable connectors
+    editableCcPairsIndexingStatuses.forEach((status) => {
+      const source = status.connector.source;
+      if (!grouped[source]) {
+        grouped[source] = [];
+      }
+      grouped[source].unshift(status);
+    });
+
+    // Then, add non-editable connectors
     ccPairsIndexingStatuses.forEach((status) => {
       const source = status.connector.source;
       if (!grouped[source]) {
         grouped[source] = [];
       }
-      grouped[source].push(status);
+      if (
+        !editableCcPairsIndexingStatuses.some(
+          (e) => e.cc_pair_id === status.cc_pair_id
+        )
+      ) {
+        grouped[source].push(status);
+      }
     });
 
     const sorted = Object.keys(grouped).sort() as ValidSources[];
@@ -329,7 +363,7 @@ export function CCPairIndexingStatusTable({
       sortedSources: sorted,
       groupSummaries: summaries,
     };
-  }, [ccPairsIndexingStatuses]);
+  }, [ccPairsIndexingStatuses, editableCcPairsIndexingStatuses]);
 
   const toggleSource = (
     source: ValidSources,
@@ -409,7 +443,9 @@ export function CCPairIndexingStatusTable({
             error_msg: "",
             deletion_attempt: null,
             is_deletable: true,
+            groups: [], // Add this line
           }}
+          isEditable={false}
         />
         <div className="-mb-10" />
 
@@ -421,7 +457,7 @@ export function CCPairIndexingStatusTable({
               placeholder="Search connectors..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="ml-2 w-96 h-9 flex-none rounded-md border-2 border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="ml-2 w-96 h-9 flex-none rounded-md border border-border bg-background-50 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
 
             <Button className="h-9" onClick={() => toggleSources()}>
@@ -474,7 +510,7 @@ export function CCPairIndexingStatusTable({
                             <TableHeaderCell
                               className={`w-[${columnWidths.fourth}]`}
                             >
-                              Public
+                              Permissions
                             </TableHeaderCell>
                           )}
                           <TableHeaderCell
@@ -498,6 +534,11 @@ export function CCPairIndexingStatusTable({
                           <ConnectorRow
                             key={ccPairsIndexingStatus.cc_pair_id}
                             ccPairsIndexingStatus={ccPairsIndexingStatus}
+                            isEditable={editableCcPairsIndexingStatuses.some(
+                              (e) =>
+                                e.cc_pair_id ===
+                                ccPairsIndexingStatus.cc_pair_id
+                            )}
                           />
                         ))}
                       </>

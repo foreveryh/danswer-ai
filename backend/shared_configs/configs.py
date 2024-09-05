@@ -58,9 +58,11 @@ LOG_LEVEL = os.environ.get("LOG_LEVEL", "notice")
 
 # Fields which should only be set on new search setting
 PRESERVED_SEARCH_FIELDS = [
+    "id",
     "provider_type",
     "api_key",
     "model_name",
+    "api_url",
     "index_name",
     "multipass_indexing",
     "model_dim",

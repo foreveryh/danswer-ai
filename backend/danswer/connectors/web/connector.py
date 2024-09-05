@@ -27,7 +27,7 @@ from danswer.connectors.interfaces import GenerateDocumentsOutput
 from danswer.connectors.interfaces import LoadConnector
 from danswer.connectors.models import Document
 from danswer.connectors.models import Section
-from danswer.file_processing.extract_file_text import pdf_to_text
+from danswer.file_processing.extract_file_text import read_pdf_file
 from danswer.file_processing.html_utils import web_html_cleanup
 from danswer.utils.logger import setup_logger
 from danswer.utils.sitemap import list_pages_for_site
@@ -85,7 +85,8 @@ def check_internet_connection(url: str) -> None:
         response = requests.get(url, timeout=3)
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
-        status_code = e.response.status_code
+        # Extract status code from the response, defaulting to -1 if response is None
+        status_code = e.response.status_code if e.response is not None else -1
         error_msg = {
             400: "Bad Request",
             401: "Unauthorized",
@@ -284,7 +285,9 @@ class WebConnector(LoadConnector):
                 if current_url.split(".")[-1] == "pdf":
                     # PDF files are not checked for links
                     response = requests.get(current_url)
-                    page_text = pdf_to_text(file=io.BytesIO(response.content))
+                    page_text, metadata = read_pdf_file(
+                        file=io.BytesIO(response.content)
+                    )
 
                     doc_batch.append(
                         Document(
@@ -292,7 +295,7 @@ class WebConnector(LoadConnector):
                             sections=[Section(link=current_url, text=page_text)],
                             source=DocumentSource.WEB,
                             semantic_identifier=current_url.split("/")[-1],
-                            metadata={},
+                            metadata=metadata,
                         )
                     )
                     continue

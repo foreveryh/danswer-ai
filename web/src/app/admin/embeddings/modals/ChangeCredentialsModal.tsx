@@ -15,14 +15,16 @@ export function ChangeCredentialsModal({
   onCancel,
   onDeleted,
   useFileUpload,
+  isProxy = false,
 }: {
   provider: CloudEmbeddingProvider;
   onConfirm: () => void;
   onCancel: () => void;
   onDeleted: () => void;
   useFileUpload: boolean;
+  isProxy?: boolean;
 }) {
-  const [apiKey, setApiKey] = useState("");
+  const [apiKeyOrUrl, setApiKeyOrUrl] = useState("");
   const [testError, setTestError] = useState<string>("");
   const [fileName, setFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +52,7 @@ export function ChangeCredentialsModal({
         let jsonContent;
         try {
           jsonContent = JSON.parse(fileContent);
-          setApiKey(JSON.stringify(jsonContent));
+          setApiKeyOrUrl(JSON.stringify(jsonContent));
         } catch (parseError) {
           throw new Error(
             "Failed to parse JSON file. Please ensure it's a valid JSON."
@@ -62,7 +64,7 @@ export function ChangeCredentialsModal({
             ? error.message
             : "An unknown error occurred while processing the file."
         );
-        setApiKey("");
+        setApiKeyOrUrl("");
         clearFileInput();
       }
     }
@@ -74,7 +76,7 @@ export function ChangeCredentialsModal({
 
     try {
       const response = await fetch(
-        `${EMBEDDING_PROVIDERS_ADMIN_URL}/${provider.provider_type}`,
+        `${EMBEDDING_PROVIDERS_ADMIN_URL}/${provider.provider_type.toLowerCase()}`,
         {
           method: "DELETE",
         }
@@ -105,7 +107,10 @@ export function ChangeCredentialsModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           provider_type: provider.provider_type.toLowerCase().split(" ")[0],
-          api_key: apiKey,
+          [isProxy ? "api_url" : "api_key"]: apiKeyOrUrl,
+          [isProxy ? "api_key" : "api_url"]: isProxy
+            ? provider.api_key
+            : provider.api_url,
         }),
       });
 
@@ -119,7 +124,7 @@ export function ChangeCredentialsModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           provider_type: provider.provider_type.toLowerCase().split(" ")[0],
-          api_key: apiKey,
+          [isProxy ? "api_url" : "api_key"]: apiKeyOrUrl,
           is_default_provider: false,
           is_configured: true,
         }),
@@ -128,7 +133,8 @@ export function ChangeCredentialsModal({
       if (!updateResponse.ok) {
         const errorData = await updateResponse.json();
         throw new Error(
-          errorData.detail || "Failed to update provider- check your API key"
+          errorData.detail ||
+            `Failed to update provider- check your ${isProxy ? "API URL" : "API key"}`
         );
       }
 
@@ -144,37 +150,25 @@ export function ChangeCredentialsModal({
     <Modal
       width="max-w-3xl"
       icon={provider.icon}
-      title={`Modify your ${provider.provider_type} key`}
+      title={`Modify your ${provider.provider_type} ${isProxy ? "URL" : "key"}`}
       onOutsideClick={onCancel}
     >
-      <div className="mb-4">
-        <Subtitle className="font-bold text-lg">
-          Want to swap out your key?
-        </Subtitle>
-        <a
-          href={provider.apiLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline cursor-pointer mt-2 mb-4"
-        >
-          Visit API
-        </a>
+      <>
+        {isProxy && (
+          <div className="mb-4">
+            <Subtitle className="font-bold text-lg">
+              Want to swap out your URL?
+            </Subtitle>
+            <a
+              href={provider.apiLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline cursor-pointer mt-2 mb-4"
+            >
+              Visit API
+            </a>
 
-        <div className="flex flex-col mt-4 gap-y-2">
-          {useFileUpload ? (
-            <>
-              <Label>Upload JSON File</Label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleFileUpload}
-                className="text-lg w-full p-1"
-              />
-              {fileName && <p>Uploaded file: {fileName}</p>}
-            </>
-          ) : (
-            <>
+            <div className="flex flex-col mt-4 gap-y-2">
               <input
                 className={`
                     border 
@@ -185,48 +179,118 @@ export function ChangeCredentialsModal({
                     px-3 
                     bg-background-emphasis
                 `}
-                value={apiKey}
-                onChange={(e: any) => setApiKey(e.target.value)}
-                placeholder="Paste your API key here"
+                value={apiKeyOrUrl}
+                onChange={(e: any) => setApiKeyOrUrl(e.target.value)}
+                placeholder="Paste your API URL here"
               />
-            </>
+            </div>
+
+            {testError && (
+              <Callout title="Error" color="red" className="mt-4">
+                {testError}
+              </Callout>
+            )}
+
+            <div className="flex mt-4 justify-between">
+              <Button
+                color="blue"
+                onClick={() => handleSubmit()}
+                disabled={!apiKeyOrUrl}
+              >
+                Swap URL
+              </Button>
+            </div>
+
+            {deletionError && (
+              <Callout title="Error" color="red" className="mt-4">
+                {deletionError}
+              </Callout>
+            )}
+            <Divider />
+          </div>
+        )}
+
+        <div className="mb-4">
+          <Subtitle className="font-bold text-lg">
+            Want to swap out your key?
+          </Subtitle>
+          <a
+            href={provider.apiLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline cursor-pointer mt-2 mb-4"
+          >
+            Visit API
+          </a>
+
+          <div className="flex flex-col mt-4 gap-y-2">
+            {useFileUpload ? (
+              <>
+                <Label>Upload JSON File</Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileUpload}
+                  className="text-lg w-full p-1"
+                />
+                {fileName && <p>Uploaded file: {fileName}</p>}
+              </>
+            ) : (
+              <>
+                <input
+                  className={`
+                    border 
+                    border-border 
+                    rounded 
+                    w-full 
+                    py-2 
+                    px-3 
+                    bg-background-emphasis
+                `}
+                  value={apiKeyOrUrl}
+                  onChange={(e: any) => setApiKeyOrUrl(e.target.value)}
+                  placeholder="Paste your API key here"
+                />
+              </>
+            )}
+          </div>
+
+          {testError && (
+            <Callout title="Error" color="red" className="mt-4">
+              {testError}
+            </Callout>
+          )}
+
+          <div className="flex mt-4 justify-between">
+            <Button
+              color="blue"
+              onClick={() => handleSubmit()}
+              disabled={!apiKeyOrUrl}
+            >
+              Swap Key
+            </Button>
+          </div>
+          <Divider />
+
+          <Subtitle className="mt-4 font-bold text-lg mb-2">
+            You can also delete your configuration.
+          </Subtitle>
+          <Text className="mb-2">
+            This is only possible if you have already switched to a different
+            embedding type!
+          </Text>
+
+          <Button onClick={handleDelete} color="red">
+            Delete Configuration
+          </Button>
+          {deletionError && (
+            <Callout title="Error" color="red" className="mt-4">
+              {deletionError}
+            </Callout>
           )}
         </div>
-
-        {testError && (
-          <Callout title="Error" color="red" className="mt-4">
-            {testError}
-          </Callout>
-        )}
-
-        <div className="flex mt-4 justify-between">
-          <Button
-            color="blue"
-            onClick={() => handleSubmit()}
-            disabled={!apiKey}
-          >
-            Swap Key
-          </Button>
-        </div>
-        <Divider />
-
-        <Subtitle className="mt-4 font-bold text-lg mb-2">
-          You can also delete your key.
-        </Subtitle>
-        <Text className="mb-2">
-          This is only possible if you have already switched to a different
-          embedding type!
-        </Text>
-
-        <Button onClick={handleDelete} color="red">
-          Delete key
-        </Button>
-        {deletionError && (
-          <Callout title="Error" color="red" className="mt-4">
-            {deletionError}
-          </Callout>
-        )}
-      </div>
+      </>
     </Modal>
   );
 }

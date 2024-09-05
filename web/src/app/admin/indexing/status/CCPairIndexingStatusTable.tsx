@@ -457,7 +457,7 @@ export function CCPairIndexingStatusTable({
               placeholder="Search connectors..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="ml-2 w-96 h-9 flex-none rounded-md border border-border bg-background-50 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="ml-1 w-96 h-9 flex-none rounded-md border border-border bg-background-50 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
 
             <Button className="h-9" onClick={() => toggleSources()}>
@@ -465,7 +465,10 @@ export function CCPairIndexingStatusTable({
             </Button>
           </div>
           {sortedSources
-            .filter((source) => source != "not_applicable")
+            .filter(
+              (source) =>
+                source != "not_applicable" && source != "ingestion_api"
+            )
             .map((source, ind) => {
               const sourceMatches = source
                 .toLowerCase()
@@ -479,7 +482,7 @@ export function CCPairIndexingStatusTable({
               if (sourceMatches || matchingConnectors.length > 0) {
                 return (
                   <React.Fragment key={ind}>
-                    <div className="mt-4" />
+                    <br className="mt-4" />
 
                     <SummaryRow
                       source={source}

@@ -4,7 +4,7 @@ import { NonNullChain } from "typescript";
 export interface RerankingDetails {
   rerank_model_name: string | null;
   rerank_provider_type: RerankerProvider | null;
-  api_key: string | null;
+  rerank_api_key: string | null;
   num_rerank: number;
 }
 
@@ -21,6 +21,7 @@ export interface AdvancedSearchConfiguration {
   multipass_indexing: boolean;
   multilingual_expansion: string[];
   disable_rerank_for_streaming: boolean;
+  api_url: string | null;
 }
 
 export interface SavedSearchSettings extends RerankingDetails {
@@ -33,6 +34,7 @@ export interface SavedSearchSettings extends RerankingDetails {
   multipass_indexing: boolean;
   multilingual_expansion: string[];
   disable_rerank_for_streaming: boolean;
+  api_url: string | null;
   provider_type: EmbeddingProvider | null;
 }
 

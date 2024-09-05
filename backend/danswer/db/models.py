@@ -608,6 +608,10 @@ class SearchSettings(Base):
           cloud_provider='{self.cloud_provider.provider_type if self.cloud_provider else 'None'}')>"
 
     @property
+    def api_url(self) -> str | None:
+        return self.cloud_provider.api_url if self.cloud_provider is not None else None
+
+    @property
     def api_key(self) -> str | None:
         return self.cloud_provider.api_key if self.cloud_provider is not None else None
 
@@ -671,7 +675,11 @@ class IndexAttempt(Base):
         "SearchSettings", back_populates="index_attempts"
     )
 
-    error_rows = relationship("IndexAttemptError", back_populates="index_attempt")
+    error_rows = relationship(
+        "IndexAttemptError",
+        back_populates="index_attempt",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index(
@@ -1085,6 +1093,7 @@ class CloudEmbeddingProvider(Base):
     provider_type: Mapped[EmbeddingProvider] = mapped_column(
         Enum(EmbeddingProvider), primary_key=True
     )
+    api_url: Mapped[str | None] = mapped_column(String, nullable=True)
     api_key: Mapped[str | None] = mapped_column(EncryptedString())
     search_settings: Mapped[list["SearchSettings"]] = relationship(
         "SearchSettings",
@@ -1400,7 +1409,7 @@ class TaskQueueState(Base):
     __tablename__ = "task_queue_jobs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # Celery task id
+    # Celery task id. currently only for readability/diagnostics
     task_id: Mapped[str] = mapped_column(String)
     # For any job type, this would be the same
     task_name: Mapped[str] = mapped_column(String)

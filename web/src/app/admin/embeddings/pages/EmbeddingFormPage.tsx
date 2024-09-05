@@ -41,10 +41,11 @@ export default function EmbeddingForm() {
       multipass_indexing: true,
       multilingual_expansion: [],
       disable_rerank_for_streaming: false,
+      api_url: null,
     });
 
   const [rerankingDetails, setRerankingDetails] = useState<RerankingDetails>({
-    api_key: "",
+    rerank_api_key: "",
     num_rerank: 0,
     rerank_provider_type: null,
     rerank_model_name: "",
@@ -116,9 +117,10 @@ export default function EmbeddingForm() {
         multilingual_expansion: searchSettings.multilingual_expansion,
         disable_rerank_for_streaming:
           searchSettings.disable_rerank_for_streaming,
+        api_url: null,
       });
       setRerankingDetails({
-        api_key: searchSettings.api_key,
+        rerank_api_key: searchSettings.rerank_api_key,
         num_rerank: searchSettings.num_rerank,
         rerank_provider_type: searchSettings.rerank_provider_type,
         rerank_model_name: searchSettings.rerank_model_name,
@@ -128,13 +130,13 @@ export default function EmbeddingForm() {
 
   const originalRerankingDetails: RerankingDetails = searchSettings
     ? {
-        api_key: searchSettings.api_key,
+        rerank_api_key: searchSettings.rerank_api_key,
         num_rerank: searchSettings.num_rerank,
         rerank_provider_type: searchSettings.rerank_provider_type,
         rerank_model_name: searchSettings.rerank_model_name,
       }
     : {
-        api_key: "",
+        rerank_api_key: "",
         num_rerank: 0,
         rerank_provider_type: null,
         rerank_model_name: "",
@@ -415,6 +417,12 @@ export default function EmbeddingForm() {
           <>
             <Card>
               <AdvancedEmbeddingFormPage
+                updateNumRerank={(newNumRerank: number) =>
+                  setRerankingDetails({
+                    ...rerankingDetails,
+                    num_rerank: newNumRerank,
+                  })
+                }
                 numRerank={rerankingDetails.num_rerank}
                 advancedEmbeddingDetails={advancedEmbeddingDetails}
                 updateAdvancedEmbeddingDetails={updateAdvancedEmbeddingDetails}

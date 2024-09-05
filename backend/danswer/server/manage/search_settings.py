@@ -14,6 +14,7 @@ from danswer.db.index_attempt import expire_index_attempts
 from danswer.db.models import IndexModelStatus
 from danswer.db.models import User
 from danswer.db.search_settings import create_search_settings
+from danswer.db.search_settings import delete_search_settings
 from danswer.db.search_settings import get_current_search_settings
 from danswer.db.search_settings import get_embedding_provider_from_provider_type
 from danswer.db.search_settings import get_secondary_search_settings
@@ -23,6 +24,7 @@ from danswer.document_index.factory import get_default_document_index
 from danswer.natural_language_processing.search_nlp_models import clean_model_name
 from danswer.search.models import SavedSearchSettings
 from danswer.search.models import SearchSettingsCreationRequest
+from danswer.server.manage.embedding.models import SearchSettingsDeleteRequest
 from danswer.server.manage.models import FullModelVersionResponse
 from danswer.server.models import IdReturn
 from danswer.utils.logger import setup_logger
@@ -45,7 +47,7 @@ def set_new_search_settings(
     if search_settings_new.index_name:
         logger.warning("Index name was specified by request, this is not suggested")
 
-    # Validate cloud provider exists
+    # Validate cloud provider exists or create new LiteLLM provider
     if search_settings_new.provider_type is not None:
         cloud_provider = get_embedding_provider_from_provider_type(
             db_session, provider_type=search_settings_new.provider_type
@@ -97,6 +99,7 @@ def set_new_search_settings(
         primary_index_name=search_settings.index_name,
         secondary_index_name=new_search_settings.index_name,
     )
+
     document_index.ensure_indices_exist(
         index_embedding_dim=search_settings.model_dim,
         secondary_index_embedding_dim=new_search_settings.model_dim,
@@ -132,8 +135,23 @@ def cancel_new_embedding(
         )
 
 
+@router.delete("/delete-search-settings")
+def delete_search_settings_endpoint(
+    deletion_request: SearchSettingsDeleteRequest,
+    _: User | None = Depends(current_admin_user),
+    db_session: Session = Depends(get_session),
+) -> None:
+    try:
+        delete_search_settings(
+            db_session=db_session,
+            search_settings_id=deletion_request.search_settings_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 @router.get("/get-current-search-settings")
-def get_curr_search_settings(
+def get_current_search_settings_endpoint(
     _: User | None = Depends(current_user),
     db_session: Session = Depends(get_session),
 ) -> SavedSearchSettings:
@@ -142,7 +160,7 @@ def get_curr_search_settings(
 
 
 @router.get("/get-secondary-search-settings")
-def get_sec_search_settings(
+def get_secondary_search_settings_endpoint(
     _: User | None = Depends(current_user),
     db_session: Session = Depends(get_session),
 ) -> SavedSearchSettings | None:

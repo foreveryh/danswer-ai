@@ -25,9 +25,6 @@ from langchain_core.messages.tool import ToolMessage
 from danswer.configs.app_configs import LOG_ALL_MODEL_INTERACTIONS
 from danswer.configs.app_configs import LOG_DANSWER_MODEL_INTERACTIONS
 from danswer.configs.model_configs import DISABLE_LITELLM_STREAMING
-from danswer.configs.model_configs import GEN_AI_API_ENDPOINT
-from danswer.configs.model_configs import GEN_AI_API_VERSION
-from danswer.configs.model_configs import GEN_AI_LLM_PROVIDER_TYPE
 from danswer.configs.model_configs import GEN_AI_TEMPERATURE
 from danswer.llm.interfaces import LLM
 from danswer.llm.interfaces import LLMConfig
@@ -141,7 +138,9 @@ def _convert_message_to_dict(message: BaseMessage) -> dict:
 
 
 def _convert_delta_to_message_chunk(
-    _dict: dict[str, Any], curr_msg: BaseMessage | None
+    _dict: dict[str, Any],
+    curr_msg: BaseMessage | None,
+    stop_reason: str | None = None,
 ) -> BaseMessageChunk:
     """Adapted from langchain_community.chat_models.litellm._convert_delta_to_message_chunk"""
     role = _dict.get("role") or (_base_msg_to_role(curr_msg) if curr_msg else None)
@@ -166,12 +165,23 @@ def _convert_delta_to_message_chunk(
                 args=tool_call.function.arguments,
                 index=0,  # only support a single tool call atm
             )
+
             return AIMessageChunk(
                 content=content,
-                additional_kwargs=additional_kwargs,
                 tool_call_chunks=[tool_call_chunk],
+                additional_kwargs={
+                    "usage_metadata": {"stop": stop_reason},
+                    **additional_kwargs,
+                },
             )
-        return AIMessageChunk(content=content, additional_kwargs=additional_kwargs)
+
+        return AIMessageChunk(
+            content=content,
+            additional_kwargs={
+                "usage_metadata": {"stop": stop_reason},
+                **additional_kwargs,
+            },
+        )
     elif role == "system":
         return SystemMessageChunk(content=content)
     elif role == "function":
@@ -192,10 +202,10 @@ class DefaultMultiLLM(LLM):
         timeout: int,
         model_provider: str,
         model_name: str,
+        api_base: str | None = None,
+        api_version: str | None = None,
         max_output_tokens: int | None = None,
-        api_base: str | None = GEN_AI_API_ENDPOINT,
-        api_version: str | None = GEN_AI_API_VERSION,
-        custom_llm_provider: str | None = GEN_AI_LLM_PROVIDER_TYPE,
+        custom_llm_provider: str | None = None,
         temperature: float = GEN_AI_TEMPERATURE,
         custom_config: dict[str, str] | None = None,
         extra_headers: dict[str, str] | None = None,
@@ -209,7 +219,7 @@ class DefaultMultiLLM(LLM):
         self._api_version = api_version
         self._custom_llm_provider = custom_llm_provider
 
-        # This can be used to store the maximum output tkoens for this model.
+        # This can be used to store the maximum output tokens for this model.
         # self._max_output_tokens = (
         #     max_output_tokens
         #     if max_output_tokens is not None
@@ -352,10 +362,16 @@ class DefaultMultiLLM(LLM):
         )
         try:
             for part in response:
-                if len(part["choices"]) == 0:
+                if not part["choices"]:
                     continue
-                delta = part["choices"][0]["delta"]
-                message_chunk = _convert_delta_to_message_chunk(delta, output)
+
+                choice = part["choices"][0]
+                message_chunk = _convert_delta_to_message_chunk(
+                    choice["delta"],
+                    output,
+                    stop_reason=choice["finish_reason"],
+                )
+
                 if output is None:
                     output = message_chunk
                 else:

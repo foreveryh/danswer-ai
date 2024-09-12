@@ -226,10 +226,10 @@ export const credentialTemplates: Record<ValidSources, any> = {
     portal_id: "",
     document360_api_token: "",
   } as Document360CredentialJson,
-  paperless: {
-    paperless_base_url: "",
-    paperless_api_token: "",
-  } as PaperlessCredentialJson,
+  // paperless: {
+  //   paperless_base_url: "",
+  //   paperless_api_token: "",
+  // } as PaperlessCredentialJson,
   requesttracker: {
     requesttracker_username: "",
     requesttracker_password: "",

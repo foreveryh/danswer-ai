@@ -529,28 +529,28 @@ For example, specifying .*-support.* as a "channel" will cause the connector to 
       },
     ],
   },
-  paperless: {
-    description: "Configure Paperless connector",
-    values: [
-      {
-        type: "text",
-        query: "Enter the base URL:",
-        label: "Base URL",
-        name: "base_url",
-        optional: false,
-        description: "Specify the base URL for your Paperless Server.",
-      },
-      {
-        type: "list",
-        query: "Enter categories to include",
-        label: "Categories",
-        name: "categories",
-        optional: true,
-        description:
-          "Specify 0 or more categories to index. For instance, specifying the category 'Help' will cause us to only index all content within the 'Help' category. If no categories are specified, all categories in your workspace will be indexed.",
-      },
-    ],
-  },
+  // paperless: {
+  //   description: "Configure Paperless connector",
+  //   values: [
+  //     {
+  //       type: "text",
+  //       query: "Enter the base URL:",
+  //       label: "Base URL",
+  //       name: "base_url",
+  //       optional: false,
+  //       description: "Specify the base URL for your Paperless Server.",
+  //     },
+  //     {
+  //       type: "list",
+  //       query: "Enter categories to include",
+  //       label: "Categories",
+  //       name: "categories",
+  //       optional: true,
+  //       description:
+  //         "Specify 0 or more categories to index. For instance, specifying the category 'Help' will cause us to only index all content within the 'Help' category. If no categories are specified, all categories in your workspace will be indexed.",
+  //     },
+  //   ],
+  // },
   clickup: {
     description: "Configure ClickUp connector",
     values: [

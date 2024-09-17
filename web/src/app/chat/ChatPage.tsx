@@ -426,7 +426,7 @@ export function ChatPage({
   }, [existingChatSessionId]);
 
   const [message, setMessage] = useState(
-    searchParams.get(SEARCH_PARAM_NAMES.USER_MESSAGE) || ""
+    searchParams.get(SEARCH_PARAM_NAMES.USER_PROMPT) || ""
   );
 
   const [completeMessageDetail, setCompleteMessageDetail] = useState<
@@ -1124,9 +1124,9 @@ export function ChatPage({
 
       await delay(50);
       while (!stack.isComplete || !stack.isEmpty()) {
-        await delay(2);
+        await delay(0.5);
 
-        if (!stack.isEmpty()) {
+        if (!stack.isEmpty() && !controller.signal.aborted) {
           const packet = stack.nextPacket();
           if (!packet) {
             continue;
@@ -1432,13 +1432,13 @@ export function ChatPage({
   };
 
   const handleImageUpload = (acceptedFiles: File[]) => {
-    const llmAcceptsImages = checkLLMSupportsImageInput(
-      ...getFinalLLM(
-        llmProviders,
-        liveAssistant,
-        llmOverrideManager.llmOverride
-      )
+    const [_, llmModel] = getFinalLLM(
+      llmProviders,
+      liveAssistant,
+      llmOverrideManager.llmOverride
     );
+    const llmAcceptsImages = checkLLMSupportsImageInput(llmModel);
+
     const imageFiles = acceptedFiles.filter((file) =>
       file.type.startsWith("image/")
     );
@@ -1795,7 +1795,7 @@ export function ChatPage({
               const responseJson = await response.json();
               setPopup({ message: responseJson.detail, type: "error" });
             }
-            router.refresh();
+            refreshChatSessions();
           }}
         />
       )}

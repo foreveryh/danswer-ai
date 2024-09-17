@@ -10,7 +10,8 @@ founders@danswer.ai for more information. Please visit https://github.com/danswe
 
 # Default DANSWER_VERSION, typically overriden during builds by GitHub Actions.
 ARG DANSWER_VERSION=0.3-dev
-ENV DANSWER_VERSION=${DANSWER_VERSION}
+ENV DANSWER_VERSION=${DANSWER_VERSION} \
+    DANSWER_RUNNING_IN_DOCKER="true"
 
 # 定义构建参数
 ARG DEBIAN_MIRROR=http://deb.debian.org

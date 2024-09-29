@@ -159,10 +159,17 @@ REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD") or ""
 REDIS_DB_NUMBER = int(os.environ.get("REDIS_DB_NUMBER", 0))
 
 # Used by celery as broker and backend
-REDIS_DB_NUMBER_CELERY = int(os.environ.get("REDIS_DB_NUMBER_CELERY", 15))
+REDIS_DB_NUMBER_CELERY_RESULT_BACKEND = int(
+    os.environ.get("REDIS_DB_NUMBER_CELERY_RESULT_BACKEND", 14)
+)
+REDIS_DB_NUMBER_CELERY = int(os.environ.get("REDIS_DB_NUMBER_CELERY", 15))  # broker
 
-REDIS_SSL_CERT_REQS = os.getenv("REDIS_SSL_CERT_REQS", "CERT_NONE")
-REDIS_SSL_CA_CERTS = os.getenv("REDIS_SSL_CA_CERTS", "")
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#redis-backend-settings
+# should be one of "required", "optional", or "none"
+REDIS_SSL_CERT_REQS = os.getenv("REDIS_SSL_CERT_REQS", "none")
+REDIS_SSL_CA_CERTS = os.getenv("REDIS_SSL_CA_CERTS", None)
+
+CELERY_RESULT_EXPIRES = int(os.environ.get("CELERY_RESULT_EXPIRES", 86400))  # seconds
 
 #####
 # Connector Configs
@@ -240,6 +247,10 @@ JIRA_CONNECTOR_LABELS_TO_SKIP = [
     for ignored_tag in os.environ.get("JIRA_CONNECTOR_LABELS_TO_SKIP", "").split(",")
     if ignored_tag
 ]
+# Maximum size for Jira tickets in bytes (default: 100KB)
+JIRA_CONNECTOR_MAX_TICKET_SIZE = int(
+    os.environ.get("JIRA_CONNECTOR_MAX_TICKET_SIZE", 100 * 1024)
+)
 
 GONG_CONNECTOR_START_TIME = os.environ.get("GONG_CONNECTOR_START_TIME")
 
@@ -263,7 +274,7 @@ ALLOW_SIMULTANEOUS_PRUNING = (
     os.environ.get("ALLOW_SIMULTANEOUS_PRUNING", "").lower() == "true"
 )
 
-# This is the maxiumum rate at which documents are queried for a pruning job. 0 disables the limitation.
+# This is the maximum rate at which documents are queried for a pruning job. 0 disables the limitation.
 MAX_PRUNING_DOCUMENT_RETRIEVAL_PER_MINUTE = int(
     os.environ.get("MAX_PRUNING_DOCUMENT_RETRIEVAL_PER_MINUTE", 0)
 )

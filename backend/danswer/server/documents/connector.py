@@ -62,8 +62,9 @@ from danswer.db.credentials import delete_gmail_service_account_credentials
 from danswer.db.credentials import delete_google_drive_service_account_credentials
 from danswer.db.credentials import fetch_credential_by_id
 from danswer.db.deletion_attempt import check_deletion_attempt_is_allowed
-from danswer.db.document import get_document_cnts_for_cc_pairs
+from danswer.db.document import get_document_counts_for_cc_pairs
 from danswer.db.engine import get_session
+from danswer.db.enums import AccessType
 from danswer.db.index_attempt import create_index_attempt
 from danswer.db.index_attempt import get_index_attempts_for_cc_pair
 from danswer.db.index_attempt import get_latest_index_attempt_for_cc_pair_id
@@ -511,7 +512,7 @@ def get_connector_indexing_status(
         for index_attempt in latest_index_attempts
     }
 
-    document_count_info = get_document_cnts_for_cc_pairs(
+    document_count_info = get_document_counts_for_cc_pairs(
         db_session=db_session,
         cc_pair_identifiers=cc_pair_identifiers,
     )
@@ -559,7 +560,7 @@ def get_connector_indexing_status(
                 cc_pair_status=cc_pair.status,
                 connector=ConnectorSnapshot.from_connector_db_model(connector),
                 credential=CredentialSnapshot.from_credential_db_model(credential),
-                public_doc=cc_pair.is_public,
+                access_type=cc_pair.access_type,
                 owner=credential.user.email if credential.user else "",
                 groups=group_cc_pair_relationships_dict.get(cc_pair.id, []),
                 last_finished_status=(
@@ -668,12 +669,15 @@ def create_connector_with_mock_credential(
         credential = create_credential(
             mock_credential, user=user, db_session=db_session
         )
+        access_type = (
+            AccessType.PUBLIC if connector_data.is_public else AccessType.PRIVATE
+        )
         response = add_credential_to_connector(
             db_session=db_session,
             user=user,
             connector_id=cast(int, connector_response.id),  # will aways be an int
             credential_id=credential.id,
-            is_public=connector_data.is_public or False,
+            access_type=access_type,
             cc_pair_name=connector_data.name,
             groups=connector_data.groups,
         )
@@ -968,7 +972,7 @@ def get_basic_connector_indexing_status(
         )
         for cc_pair in cc_pairs
     ]
-    document_count_info = get_document_cnts_for_cc_pairs(
+    document_count_info = get_document_counts_for_cc_pairs(
         db_session=db_session,
         cc_pair_identifiers=cc_pair_identifiers,
     )

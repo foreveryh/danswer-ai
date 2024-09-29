@@ -52,7 +52,7 @@ import litellmIcon from "../../../public/LiteLLM.jpg";
 
 import awsWEBP from "../../../public/Amazon.webp";
 import azureIcon from "../../../public/Azure.png";
-
+import asanaIcon from "../../../public/Asana.png";
 import anthropicSVG from "../../../public/Anthropic.svg";
 import nomicSVG from "../../../public/nomic.svg";
 import microsoftIcon from "../../../public/microsoft.png";
@@ -87,7 +87,7 @@ import cohereIcon from "../../../public/Cohere.svg";
 import voyageIcon from "../../../public/Voyage.png";
 import googleIcon from "../../../public/Google.webp";
 import paperlessIcon from "../../../public/Document360.png";
-
+import xenforoIcon from "../../../public/Xenforo.svg";
 import { FaRobot } from "react-icons/fa";
 
 export interface IconProps {
@@ -2826,3 +2826,29 @@ export const WindowsIcon = ({
     </svg>
   );
 };
+
+export const XenforoIcon = ({
+  size = 16,
+  className = defaultTailwindCSS,
+}: IconProps) => {
+  return (
+    <div
+      style={{ width: `${size}px`, height: `${size}px` }}
+      className={`w-[${size}px] h-[${size}px] ` + className}
+    >
+      <Image src={xenforoIcon} alt="Logo" width="96" height="96" />
+    </div>
+  );
+};
+
+export const AsanaIcon = ({
+  size = 16,
+  className = defaultTailwindCSS,
+}: IconProps) => (
+  <div
+    style={{ width: `${size}px`, height: `${size}px` }}
+    className={`w-[${size}px] h-[${size}px] ` + className}
+  >
+    <Image src={asanaIcon} alt="Logo" width="96" height="96" />
+  </div>
+);

@@ -1,3 +1,4 @@
+import itertools
 from collections.abc import Callable
 from collections.abc import Iterator
 from typing import Any
@@ -179,6 +180,7 @@ class Answer:
                         if self.answer_style_config.citation_config
                         else False
                     ),
+                    history_message=self.single_message_history or "",
                 )
             )
         elif self.answer_style_config.quotes_config:
@@ -553,12 +555,19 @@ class Answer:
 
                 def _stream() -> Iterator[str]:
                     nonlocal stream_stop_info
-                    yield cast(str, message)
-                    for item in stream:
+                    for item in itertools.chain([message], stream):
                         if isinstance(item, StreamStopInfo):
                             stream_stop_info = item
                             return
-                        yield cast(str, item)
+
+                        # this should never happen, but we're seeing weird behavior here so handling for now
+                        if not isinstance(item, str):
+                            logger.error(
+                                f"Received non-string item in answer stream: {item}. Skipping."
+                            )
+                            continue
+
+                        yield item
 
                 yield from process_answer_stream_fn(_stream())
 

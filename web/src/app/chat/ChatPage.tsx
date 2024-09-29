@@ -86,7 +86,6 @@ import {
 import { ChatInputBar } from "./input/ChatInputBar";
 import { useChatContext } from "@/components/context/ChatContext";
 import { v4 as uuidv4 } from "uuid";
-import { orderAssistantsForUser } from "@/lib/assistants/orderAssistants";
 import { ChatPopup } from "./ChatPopup";
 
 import FunctionalHeader from "@/components/chat_search/Header";
@@ -101,6 +100,11 @@ import ExceptionTraceModal from "@/components/modals/ExceptionTraceModal";
 import { SEARCH_TOOL_NAME } from "./tools/constants";
 import { useUser } from "@/components/user/UserProvider";
 import { ApiKeyModal } from "@/components/llm/ApiKeyModal";
+import {
+  classifyAssistants,
+  orderAssistantsForUser,
+} from "@/lib/assistants/utils";
+import BlurBackground from "./shared_chat_search/BlurBackground";
 
 const TEMP_USER_MESSAGE_ID = -1;
 const TEMP_ASSISTANT_MESSAGE_ID = -2;
@@ -136,7 +140,6 @@ export function ChatPage({
 
   const { user, refreshUser, isLoadingUser } = useUser();
 
-  // chat session
   const existingChatIdRaw = searchParams.get("chatId");
   const currentPersonaId = searchParams.get(SEARCH_PARAM_NAMES.PERSONA_ID);
 
@@ -155,7 +158,10 @@ export function ChatPage({
   const loadedIdSessionRef = useRef<number | null>(existingChatSessionId);
 
   // Assistants
-  const filteredAssistants = orderAssistantsForUser(availableAssistants, user);
+  const { visibleAssistants, hiddenAssistants: _ } = classifyAssistants(
+    user,
+    availableAssistants
+  );
 
   const existingChatSessionAssistantId = selectedChatSession?.persona_id;
   const [selectedAssistant, setSelectedAssistant] = useState<
@@ -210,7 +216,7 @@ export function ChatPage({
   const liveAssistant =
     alternativeAssistant ||
     selectedAssistant ||
-    filteredAssistants[0] ||
+    visibleAssistants[0] ||
     availableAssistants[0];
 
   useEffect(() => {
@@ -680,7 +686,7 @@ export function ChatPage({
   useEffect(() => {
     if (messageHistory.length === 0 && chatSessionIdRef.current === null) {
       setSelectedAssistant(
-        filteredAssistants.find((persona) => persona.id === defaultAssistantId)
+        visibleAssistants.find((persona) => persona.id === defaultAssistantId)
       );
     }
   }, [defaultAssistantId]);
@@ -1828,6 +1834,7 @@ export function ChatPage({
           onClose={() => setSharingModalVisible(false)}
         />
       )}
+
       <div className="fixed inset-0 flex flex-col text-default">
         <div className="h-[100dvh] overflow-y-hidden">
           <div className="w-full">
@@ -1837,7 +1844,7 @@ export function ChatPage({
                 flex-none
                 fixed
                 left-0
-                z-30
+                z-40
                 bg-background-100
                 h-screen
                 transition-all
@@ -1870,6 +1877,10 @@ export function ChatPage({
               </div>
             </div>
           </div>
+
+          <BlurBackground
+            visible={!untoggled && (showDocSidebar || toggledSidebar)}
+          />
 
           <div
             ref={masterFlexboxRef}
@@ -2379,7 +2390,10 @@ export function ChatPage({
                               showDocs={() => setDocumentSelection(true)}
                               selectedDocuments={selectedDocuments}
                               // assistant stuff
-                              assistantOptions={filteredAssistants}
+                              assistantOptions={orderAssistantsForUser(
+                                visibleAssistants,
+                                user
+                              )}
                               selectedAssistant={liveAssistant}
                               setSelectedAssistant={onAssistantChange}
                               setAlternativeAssistant={setAlternativeAssistant}

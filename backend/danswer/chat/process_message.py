@@ -73,7 +73,9 @@ from danswer.server.query_and_chat.models import ChatMessageDetail
 from danswer.server.query_and_chat.models import CreateChatMessageRequest
 from danswer.server.utils import get_json_line
 from danswer.tools.built_in_tools import get_built_in_tool_by_id
-from danswer.tools.custom.custom_tool import build_custom_tools_from_openapi_schema
+from danswer.tools.custom.custom_tool import (
+    build_custom_tools_from_openapi_schema_and_headers,
+)
 from danswer.tools.custom.custom_tool import CUSTOM_TOOL_RESPONSE_ID
 from danswer.tools.custom.custom_tool import CustomToolCallSummary
 from danswer.tools.force import ForceUseTool
@@ -271,6 +273,7 @@ def stream_chat_message_objects(
     use_existing_user_message: bool = False,
     litellm_additional_headers: dict[str, str] | None = None,
     is_connected: Callable[[], bool] | None = None,
+    enforce_chat_session_id_for_search_docs: bool = True,
 ) -> ChatPacketStream:
     """Streams in order:
     1. [conditional] Retrieved documents if a search needs to be run
@@ -442,6 +445,7 @@ def stream_chat_message_objects(
                 chat_session=chat_session,
                 user_id=user_id,
                 db_session=db_session,
+                enforce_chat_session_id_for_search_docs=enforce_chat_session_id_for_search_docs,
             )
 
             # Generates full documents currently
@@ -605,12 +609,13 @@ def stream_chat_message_objects(
             if db_tool_model.openapi_schema:
                 tool_dict[db_tool_model.id] = cast(
                     list[Tool],
-                    build_custom_tools_from_openapi_schema(
+                    build_custom_tools_from_openapi_schema_and_headers(
                         db_tool_model.openapi_schema,
                         dynamic_schema_info=DynamicSchemaInfo(
                             chat_session_id=chat_session_id,
                             message_id=user_message.id if user_message else None,
                         ),
+                        custom_headers=db_tool_model.custom_headers,
                     ),
                 )
 
@@ -709,6 +714,7 @@ def stream_chat_message_objects(
                     yield FinalUsedContextDocsResponse(
                         final_context_docs=packet.response
                     )
+
                 elif packet.id == IMAGE_GENERATION_RESPONSE_ID:
                     img_generation_response = cast(
                         list[ImageGenerationResponse], packet.response
@@ -745,10 +751,18 @@ def stream_chat_message_objects(
                     tool_result = packet
                 yield cast(ChatPacket, packet)
         logger.debug("Reached end of stream")
-    except Exception as e:
-        error_msg = str(e)
-        logger.exception(f"Failed to process chat message: {error_msg}")
+    except ValueError as e:
+        logger.exception("Failed to process chat message.")
 
+        error_msg = str(e)
+        yield StreamingError(error=error_msg)
+        db_session.rollback()
+        return
+
+    except Exception as e:
+        logger.exception("Failed to process chat message.")
+
+        error_msg = str(e)
         stack_trace = traceback.format_exc()
         client_error_msg = litellm_exception_to_error_msg(e, llm)
         if llm.config.api_key and len(llm.config.api_key) > 2:

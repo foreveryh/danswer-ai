@@ -27,7 +27,10 @@ ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
 RUN mkdir -p /root/.huggingface && echo -e "endpoint=${HF_ENDPOINT}\n" > /root/.huggingface/hub
 
 COPY ./requirements/model_server.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /tmp/requirements.txt --default-timeout=100
+RUN pip install --no-cache-dir --upgrade \
+        --retries 5 \
+        --timeout 30 \
+        -r /tmp/requirements.txt
 
 RUN apt-get remove -y --allow-remove-essential perl-base && \
     apt-get autoremove -y

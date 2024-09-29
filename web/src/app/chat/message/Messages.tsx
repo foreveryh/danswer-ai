@@ -8,14 +8,7 @@ import {
   FiGlobe,
 } from "react-icons/fi";
 import { FeedbackType } from "../types";
-import {
-  Dispatch,
-  SetStateAction,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import {
   DanswerDocument,
@@ -46,12 +39,7 @@ import { AssistantIcon } from "@/components/assistants/AssistantIcon";
 import { Citation } from "@/components/search/results/Citation";
 import { DocumentMetadataBlock } from "@/components/search/DocumentDisplay";
 
-import {
-  ThumbsUpIcon,
-  ThumbsDownIcon,
-  LikeFeedback,
-  DislikeFeedback,
-} from "@/components/icons/icons";
+import { LikeFeedback, DislikeFeedback } from "@/components/icons/icons";
 import {
   CustomTooltip,
   TooltipGroup,
@@ -65,6 +53,7 @@ import GeneratingImageDisplay from "../tools/GeneratingImageDisplay";
 import RegenerateOption from "../RegenerateOption";
 import { LlmOverride } from "@/lib/hooks";
 import { ContinueGenerating } from "./ContinueMessage";
+import { MemoizedLink, MemoizedParagraph } from "./MemoizedTextComponents";
 
 const TOOLS_WITH_CUSTOM_HANDLING = [
   SEARCH_TOOL_NAME,
@@ -367,50 +356,14 @@ export const AIMessage = ({
                               key={messageId}
                               className="prose max-w-full text-base"
                               components={{
-                                a: (props) => {
-                                  const { node, ...rest } = props;
-                                  const value = rest.children;
-
-                                  if (value?.toString().startsWith("*")) {
-                                    return (
-                                      <div className="flex-none bg-background-800 inline-block rounded-full h-3 w-3 ml-2" />
-                                    );
-                                  } else if (
-                                    value?.toString().startsWith("[")
-                                  ) {
-                                    // for some reason <a> tags cause the onClick to not apply
-                                    // and the links are unclickable
-                                    // TODO: fix the fact that you have to double click to follow link
-                                    // for the first link
-                                    return (
-                                      <Citation link={rest?.href}>
-                                        {rest.children}
-                                      </Citation>
-                                    );
-                                  } else {
-                                    return (
-                                      <a
-                                        onMouseDown={() =>
-                                          rest.href
-                                            ? window.open(rest.href, "_blank")
-                                            : undefined
-                                        }
-                                        className="cursor-pointer text-link hover:text-link-hover"
-                                      >
-                                        {rest.children}
-                                      </a>
-                                    );
-                                  }
-                                },
+                                a: MemoizedLink,
+                                p: MemoizedParagraph,
                                 code: (props) => (
                                   <CodeBlock
                                     className="w-full"
                                     {...props}
                                     content={content as string}
                                   />
-                                ),
-                                p: ({ node, ...props }) => (
-                                  <p {...props} className="text-default" />
                                 ),
                               }}
                               remarkPlugins={[remarkGfm]}
@@ -567,7 +520,7 @@ export const AIMessage = ({
                         ref={hoverElementRef}
                         className={`
                         absolute -bottom-5
-                        z-20
+                        z-10
                         invisible ${(isHovering || isRegenerateHovered || settings?.isMobile) && "!visible"}
                         opacity-0 ${(isHovering || isRegenerateHovered || settings?.isMobile) && "!opacity-100"}
                         translate-y-2 ${(isHovering || settings?.isMobile) && "!translate-y-0"}
@@ -733,7 +686,9 @@ export const HumanMessage = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className={`mx-auto ${shared ? "w-full" : "w-[90%]"} max-w-[790px]`}>
+      <div
+        className={`text-user-text mx-auto ${shared ? "w-full" : "w-[90%]"} max-w-[790px]`}
+      >
         <div className="xl:ml-8">
           <div className="flex flex-col mr-4">
             <FileDisplay alignBubble files={files || []} />
@@ -751,7 +706,7 @@ export const HumanMessage = ({
                       border 
                       border-border 
                       rounded-lg 
-                      bg-background-emphasis 
+                      bg-background-emphasis
                       pb-2
                       [&:has(textarea:focus)]::ring-1
                       [&:has(textarea:focus)]::ring-black

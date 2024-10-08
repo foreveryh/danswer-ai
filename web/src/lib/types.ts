@@ -3,7 +3,7 @@ import { Credential } from "./connectors/credentials";
 import { Connector } from "./connectors/connectors";
 import { ConnectorCredentialPairStatus } from "@/app/admin/connector/[ccPairId]/types";
 
-export interface UserPreferences {
+interface UserPreferences {
   chosen_assistants: number[] | null;
   visible_assistants: number[];
   hidden_assistants: number[];
@@ -272,5 +272,9 @@ export type ConfigurableSources = Exclude<
 >;
 
 // The sources that have auto-sync support on the backend
-export const validAutoSyncSources = ["confluence", "google_drive"] as const;
+export const validAutoSyncSources = [
+  "confluence",
+  "google_drive",
+  "slack",
+] as const;
 export type ValidAutoSyncSources = (typeof validAutoSyncSources)[number];

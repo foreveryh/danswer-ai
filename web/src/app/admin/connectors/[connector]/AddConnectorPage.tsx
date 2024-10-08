@@ -1,6 +1,6 @@
 "use client";
 
-import { FetchError, errorHandlingFetcher } from "@/lib/fetcher";
+import { errorHandlingFetcher } from "@/lib/fetcher";
 import useSWR, { mutate } from "swr";
 import { HealthCheckBanner } from "@/components/health/healthcheck";
 
@@ -29,6 +29,8 @@ import {
   defaultPruneFreqDays,
   defaultRefreshFreqMinutes,
   isLoadState,
+  Connector,
+  ConnectorBase,
 } from "@/lib/connectors/connectors";
 import { Modal } from "@/components/Modal";
 import GDriveMain from "./pages/gdrive/GoogleDrivePage";
@@ -41,13 +43,12 @@ import { Formik } from "formik";
 import { AccessTypeForm } from "@/components/admin/connectors/AccessTypeForm";
 import { AccessTypeGroupSelector } from "@/components/admin/connectors/AccessTypeGroupSelector";
 import NavigationRow from "./NavigationRow";
-
+import { useRouter } from "next/navigation";
 export interface AdvancedConfig {
   refreshFreq: number;
   pruneFreq: number;
   indexingStart: string;
 }
-import { Connector, ConnectorBase } from "@/lib/connectors/connectors";
 
 const BASE_CONNECTOR_URL = "/api/manage/admin/connector";
 
@@ -111,6 +112,8 @@ export default function AddConnector({
 }: {
   connector: ConfigurableSources;
 }) {
+  const router = useRouter();
+
   // State for managing credentials and files
   const [currentCredential, setCurrentCredential] =
     useState<Credential<any> | null>(null);
@@ -143,35 +146,10 @@ export default function AddConnector({
   const { liveGDriveCredential } = useGoogleDriveCredentials();
   const { liveGmailCredential } = useGmailCredentials();
 
-  const {
-    data: appCredentialData,
-    isLoading: isAppCredentialLoading,
-    error: isAppCredentialError,
-  } = useSWR<{ client_id: string }, FetchError>(
-    "/api/manage/admin/connector/google-drive/app-credential",
-    errorHandlingFetcher
-  );
-  const {
-    data: serviceAccountKeyData,
-    isLoading: isServiceAccountKeyLoading,
-    error: isServiceAccountKeyError,
-  } = useSWR<{ service_account_email: string }, FetchError>(
-    "/api/manage/admin/connector/google-drive/service-account-key",
-    errorHandlingFetcher
-  );
-
   // Check if credential is activated
   const credentialActivated =
-    (connector === "google_drive" &&
-      (liveGDriveCredential ||
-        appCredentialData ||
-        serviceAccountKeyData ||
-        currentCredential)) ||
-    (connector === "gmail" &&
-      (liveGmailCredential ||
-        appCredentialData ||
-        serviceAccountKeyData ||
-        currentCredential)) ||
+    (connector === "google_drive" && liveGDriveCredential) ||
+    (connector === "gmail" && liveGmailCredential) ||
     currentCredential;
 
   // Check if there are no credentials
@@ -226,13 +204,7 @@ export default function AddConnector({
   };
 
   const onSuccess = () => {
-    setPopup({
-      message: "Connector created! Redirecting to connector home page",
-      type: "success",
-    });
-    setTimeout(() => {
-      window.open("/admin/indexing/status", "_self");
-    }, 1000);
+    router.push("/admin/indexing/status?message=connector-created");
   };
 
   return (

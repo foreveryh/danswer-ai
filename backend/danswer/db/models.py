@@ -50,7 +50,7 @@ from danswer.db.enums import IndexingStatus
 from danswer.db.enums import IndexModelStatus
 from danswer.db.enums import TaskStatus
 from danswer.db.pydantic_type import PydanticType
-from danswer.dynamic_configs.interface import JSON_ro
+from danswer.key_value_store.interface import JSON_ro
 from danswer.file_store.models import FileDescriptor
 from danswer.llm.override_models import LLMOverride
 from danswer.llm.override_models import PromptOverride
@@ -414,6 +414,12 @@ class ConnectorCredentialPair(Base):
     last_successful_index_time: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+
+    # last successful prune
+    last_pruned: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+
     total_docs_indexed: Mapped[int] = mapped_column(Integer, default=0)
 
     connector: Mapped["Connector"] = relationship(

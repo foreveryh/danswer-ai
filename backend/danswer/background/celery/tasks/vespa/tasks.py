@@ -5,20 +5,22 @@ import redis
 from celery import shared_task
 from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
-from celery.utils.log import get_task_logger
 from redis import Redis
 from sqlalchemy.orm import Session
 
 from danswer.access.access import get_access_for_document
 from danswer.background.celery.celery_app import celery_app
+from danswer.background.celery.celery_app import task_logger
 from danswer.background.celery.celery_redis import RedisConnectorCredentialPair
 from danswer.background.celery.celery_redis import RedisConnectorDeletion
+from danswer.background.celery.celery_redis import RedisConnectorPruning
 from danswer.background.celery.celery_redis import RedisDocumentSet
 from danswer.background.celery.celery_redis import RedisUserGroup
 from danswer.configs.app_configs import JOB_TIMEOUT
 from danswer.configs.constants import CELERY_VESPA_SYNC_BEAT_LOCK_TIMEOUT
 from danswer.configs.constants import DanswerRedisLocks
 from danswer.db.connector import fetch_connector_by_id
+from danswer.db.connector import mark_ccpair_as_pruned
 from danswer.db.connector_credential_pair import add_deletion_failure_message
 from danswer.db.connector_credential_pair import (
     delete_connector_credential_pair__no_commit,
@@ -41,17 +43,13 @@ from danswer.db.models import UserGroup
 from danswer.document_index.document_index_utils import get_both_index_names
 from danswer.document_index.factory import get_default_document_index
 from danswer.document_index.interfaces import UpdateRequest
-from danswer.redis.redis_pool import RedisPool
+from danswer.redis.redis_pool import get_redis_client
 from danswer.utils.variable_functionality import fetch_versioned_implementation
 from danswer.utils.variable_functionality import (
     fetch_versioned_implementation_with_fallback,
 )
+from danswer.utils.variable_functionality import global_version
 from danswer.utils.variable_functionality import noop_fallback
-
-redis_pool = RedisPool()
-
-# use this within celery tasks to get celery task specific logging
-task_logger = get_task_logger(__name__)
 
 
 # celery auto associates tasks created inside another task,
@@ -65,7 +63,7 @@ def check_for_vespa_sync_task() -> None:
     """Runs periodically to check if any document needs syncing.
     Generates sets of tasks for Celery if syncing is needed."""
 
-    r = redis_pool.get_client()
+    r = get_redis_client()
 
     lock_beat = r.lock(
         DanswerRedisLocks.CHECK_VESPA_SYNC_BEAT_LOCK,
@@ -90,21 +88,24 @@ def check_for_vespa_sync_task() -> None:
                 )
 
             # check if any user groups are not synced
-            try:
-                fetch_user_groups = fetch_versioned_implementation(
-                    "danswer.db.user_group", "fetch_user_groups"
-                )
-
-                user_groups = fetch_user_groups(
-                    db_session=db_session, only_up_to_date=False
-                )
-                for usergroup in user_groups:
-                    try_generate_user_group_sync_tasks(
-                        usergroup, db_session, r, lock_beat
+            if global_version.is_ee_version():
+                try:
+                    fetch_user_groups = fetch_versioned_implementation(
+                        "danswer.db.user_group", "fetch_user_groups"
                     )
-            except ModuleNotFoundError:
-                # Always exceptions on the MIT version, which is expected
-                pass
+
+                    user_groups = fetch_user_groups(
+                        db_session=db_session, only_up_to_date=False
+                    )
+                    for usergroup in user_groups:
+                        try_generate_user_group_sync_tasks(
+                            usergroup, db_session, r, lock_beat
+                        )
+                except ModuleNotFoundError:
+                    # Always exceptions on the MIT version, which is expected
+                    # We shouldn't actually get here if the ee version check works
+                    pass
+
     except SoftTimeLimitExceeded:
         task_logger.info(
             "Soft time limit exceeded, task is being terminated gracefully."
@@ -280,7 +281,7 @@ def monitor_document_set_taskset(
     fence_key = key_bytes.decode("utf-8")
     document_set_id = RedisDocumentSet.get_id_from_fence_key(fence_key)
     if document_set_id is None:
-        task_logger.warning("could not parse document set id from {key}")
+        task_logger.warning(f"could not parse document set id from {fence_key}")
         return
 
     rds = RedisDocumentSet(document_set_id)
@@ -327,7 +328,7 @@ def monitor_connector_deletion_taskset(key_bytes: bytes, r: Redis) -> None:
     fence_key = key_bytes.decode("utf-8")
     cc_pair_id = RedisConnectorDeletion.get_id_from_fence_key(fence_key)
     if cc_pair_id is None:
-        task_logger.warning("could not parse document set id from {key}")
+        task_logger.warning(f"could not parse cc_pair_id from {fence_key}")
         return
 
     rcd = RedisConnectorDeletion(cc_pair_id)
@@ -352,6 +353,9 @@ def monitor_connector_deletion_taskset(key_bytes: bytes, r: Redis) -> None:
     with Session(get_sqlalchemy_engine()) as db_session:
         cc_pair = get_connector_credential_pair_from_id(cc_pair_id, db_session)
         if not cc_pair:
+            task_logger.warning(
+                f"monitor_connector_deletion_taskset - cc_pair_id not found: cc_pair_id={cc_pair_id}"
+            )
             return
 
         try:
@@ -403,18 +407,65 @@ def monitor_connector_deletion_taskset(key_bytes: bytes, r: Redis) -> None:
             add_deletion_failure_message(db_session, cc_pair.id, error_message)
             task_logger.exception(
                 f"Failed to run connector_deletion. "
-                f"connector_id={cc_pair.connector_id} credential_id={cc_pair.credential_id}"
+                f"cc_pair_id={cc_pair_id} connector_id={cc_pair.connector_id} credential_id={cc_pair.credential_id}"
             )
             raise e
 
     task_logger.info(
-        f"Successfully deleted connector_credential_pair with connector_id: '{cc_pair.connector_id}' "
-        f"and credential_id: '{cc_pair.credential_id}'. "
-        f"Deleted {initial_count} docs."
+        f"Successfully deleted cc_pair: "
+        f"cc_pair_id={cc_pair_id} "
+        f"connector_id={cc_pair.connector_id} "
+        f"credential_id={cc_pair.credential_id} "
+        f"docs_deleted={initial_count}"
     )
 
     r.delete(rcd.taskset_key)
     r.delete(rcd.fence_key)
+
+
+def monitor_ccpair_pruning_taskset(
+    key_bytes: bytes, r: Redis, db_session: Session
+) -> None:
+    fence_key = key_bytes.decode("utf-8")
+    cc_pair_id = RedisConnectorPruning.get_id_from_fence_key(fence_key)
+    if cc_pair_id is None:
+        task_logger.warning(
+            f"monitor_connector_pruning_taskset: could not parse cc_pair_id from {fence_key}"
+        )
+        return
+
+    rcp = RedisConnectorPruning(cc_pair_id)
+
+    fence_value = r.get(rcp.fence_key)
+    if fence_value is None:
+        return
+
+    generator_value = r.get(rcp.generator_complete_key)
+    if generator_value is None:
+        return
+
+    try:
+        initial_count = int(cast(int, generator_value))
+    except ValueError:
+        task_logger.error("The value is not an integer.")
+        return
+
+    count = cast(int, r.scard(rcp.taskset_key))
+    task_logger.info(
+        f"Connector pruning progress: cc_pair_id={cc_pair_id} remaining={count} initial={initial_count}"
+    )
+    if count > 0:
+        return
+
+    mark_ccpair_as_pruned(cc_pair_id, db_session)
+    task_logger.info(
+        f"Successfully pruned connector credential pair. cc_pair_id={cc_pair_id}"
+    )
+
+    r.delete(rcp.taskset_key)
+    r.delete(rcp.generator_progress_key)
+    r.delete(rcp.generator_complete_key)
+    r.delete(rcp.fence_key)
 
 
 @shared_task(name="monitor_vespa_sync", soft_time_limit=300)
@@ -426,7 +477,7 @@ def monitor_vespa_sync() -> None:
     This task lock timeout is CELERY_METADATA_SYNC_BEAT_LOCK_TIMEOUT seconds, so don't
     do anything too expensive in this function!
     """
-    r = redis_pool.get_client()
+    r = get_redis_client()
 
     lock_beat = r.lock(
         DanswerRedisLocks.MONITOR_VESPA_SYNC_BEAT_LOCK,
@@ -457,6 +508,9 @@ def monitor_vespa_sync() -> None:
                     )
                 )
                 monitor_usergroup_taskset(key_bytes, r, db_session)
+
+            for key_bytes in r.scan_iter(RedisConnectorPruning.FENCE_PREFIX + "*"):
+                monitor_ccpair_pruning_taskset(key_bytes, r, db_session)
 
         # uncomment for debugging if needed
         # r_celery = celery_app.broker_connection().channel().client

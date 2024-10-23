@@ -9,24 +9,12 @@ founders@danswer.ai for more information. Please visit https://github.com/danswe
 
 
 # Default DANSWER_VERSION, typically overriden during builds by GitHub Actions.
-ARG DANSWER_VERSION=0.3-dev
+ARG DANSWER_VERSION=0.8-dev
 ENV DANSWER_VERSION=${DANSWER_VERSION} \
     DANSWER_RUNNING_IN_DOCKER="true"
 
-# 定义构建参数
-ARG DEBIAN_MIRROR=http://deb.debian.org
-ARG PIP_INDEX_URL=https://pypi.org/simple
-ARG PIP_TRUSTED_HOST=pypi.org
-ARG HF_ENDPOINT=https://huggingface.co
+ARG CA_CERT_CONTENT=""
 
-# 确保 /etc/apt/sources.list 文件存在并替换镜像源
-RUN echo "deb ${DEBIAN_MIRROR}/debian/ bookworm main contrib non-free" > /etc/apt/sources.list && \
-    echo "deb ${DEBIAN_MIRROR}/debian/ bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
-    echo "deb ${DEBIAN_MIRROR}/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
-
-ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
-    PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST} \
-    HF_ENDPOINT=${HF_ENDPOINT}
 RUN echo "DANSWER_VERSION: ${DANSWER_VERSION}"
 # Install system dependencies
 # cmake needed for psycopg (postgres)
@@ -50,6 +38,17 @@ RUN apt-get update && \
         gcc && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
+
+
+# Conditionally write the CA certificate and update certificates
+RUN if [ -n "$CA_CERT_CONTENT" ]; then \
+    echo "Adding custom CA certificate"; \
+    echo "$CA_CERT_CONTENT" > /usr/local/share/ca-certificates/my-ca.crt && \
+    chmod 644 /usr/local/share/ca-certificates/my-ca.crt && \
+    update-ca-certificates; \
+else \
+    echo "No custom CA certificate provided"; \
+fi
 
 # Install Python dependencies
 # Remove py which is pulled in by retry, py is not needed and is a CVE
@@ -107,6 +106,7 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./danswer /app/danswer
 COPY ./shared_configs /app/shared_configs
 COPY ./alembic /app/alembic
+COPY ./alembic_tenants /app/alembic_tenants
 COPY ./alembic.ini /app/alembic.ini
 COPY supervisord.conf /usr/etc/supervisord.conf
 
@@ -116,7 +116,7 @@ COPY ./scripts/force_delete_connector_by_id.py /app/scripts/force_delete_connect
 # Put logo in assets
 COPY ./assets /app/assets
 
-ENV PYTHONPATH /app
+ENV PYTHONPATH=/app
 
 # Default command which does nothing
 # This container is used by api server and background which specify their own CMD

@@ -8,7 +8,7 @@ Edition features outside of personal development or testing purposes. Please rea
 founders@danswer.ai for more information. Please visit https://github.com/danswer-ai/danswer"
 
 # Default DANSWER_VERSION, typically overriden during builds by GitHub Actions.
-ARG DANSWER_VERSION=0.3-dev
+ARG DANSWER_VERSION=0.8-dev
 ENV DANSWER_VERSION=${DANSWER_VERSION}
 RUN echo "DANSWER_VERSION: ${DANSWER_VERSION}"
 
@@ -27,10 +27,10 @@ COPY . .
 RUN npm ci
 
 # needed to get the `standalone` dir we expect later
-ENV NEXT_PRIVATE_STANDALONE true
+ENV NEXT_PRIVATE_STANDALONE=true
 
 # Disable automatic telemetry collection
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Environment variables must be present at build time
 # https://github.com/vercel/next.js/discussions/14030
@@ -79,7 +79,7 @@ RUN rm -rf /usr/local/lib/node_modules
 # ENV NODE_ENV production  
 
 # Disable automatic telemetry collection
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Don't run production as root
 RUN addgroup --system --gid 1001 nodejs

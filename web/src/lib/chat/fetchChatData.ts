@@ -20,7 +20,7 @@ import { fetchLLMProvidersSS } from "@/lib/llm/fetchLLMs";
 import { LLMProviderDescriptor } from "@/app/admin/configuration/llm/interfaces";
 import { Folder } from "@/app/chat/folders/interfaces";
 import { personaComparator } from "@/app/admin/assistants/lib";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import {
   SIDEBAR_TOGGLED_COOKIE_NAME,
   DOCUMENT_SIDEBAR_WIDTH_COOKIE_NAME,
@@ -28,6 +28,8 @@ import {
 import { hasCompletedWelcomeFlowSS } from "@/components/initialSetup/welcome/WelcomeModalWrapper";
 import { fetchAssistantsSS } from "../assistants/fetchAssistantsSS";
 import { NEXT_PUBLIC_DEFAULT_SIDEBAR_OPEN } from "../constants";
+import { checkLLMSupportsImageInput } from "../llm/utils";
+import { redirect } from "next/navigation";
 
 interface FetchChatDataResult {
   user: User | null;
@@ -45,6 +47,8 @@ interface FetchChatDataResult {
   finalDocumentSidebarInitialWidth?: number;
   shouldShowWelcomeModal: boolean;
   userInputPrompts: InputPrompt[];
+  hasAnyConnectors: boolean;
+  hasImageCompatibleModel: boolean;
 }
 
 export async function fetchChatData(searchParams: {
@@ -97,7 +101,15 @@ export async function fetchChatData(searchParams: {
 
   const authDisabled = authTypeMetadata?.authType === "disabled";
   if (!authDisabled && !user) {
-    return { redirect: "/auth/login" };
+    const headersList = headers();
+    const fullUrl = headersList.get("x-url") || "/chat";
+    const searchParamsString = new URLSearchParams(
+      searchParams as unknown as Record<string, string>
+    ).toString();
+    const redirectUrl = searchParamsString
+      ? `${fullUrl}?${searchParamsString}`
+      : fullUrl;
+    return redirect(`/auth/login?next=${encodeURIComponent(redirectUrl)}`);
   }
 
   if (user && !user.is_verified && authTypeMetadata?.requiresVerification) {
@@ -126,8 +138,10 @@ export async function fetchChatData(searchParams: {
     );
   }
 
-  // Larger ID -> created later
-  chatSessions.sort((a, b) => (a.id > b.id ? -1 : 1));
+  chatSessions.sort(
+    (a, b) =>
+      new Date(b.time_created).getTime() - new Date(a.time_created).getTime()
+  );
 
   let documentSets: DocumentSet[] = [];
   if (documentSetsResponse?.ok) {
@@ -152,6 +166,7 @@ export async function fetchChatData(searchParams: {
     console.log(`Failed to fetch assistants - ${assistantsFetchError}`);
   }
   // remove those marked as hidden by an admin
+
   assistants = assistants.filter((assistant) => assistant.is_visible);
 
   // sort them in priority order
@@ -195,10 +210,13 @@ export async function fetchChatData(searchParams: {
     assistants = assistants.filter((assistant) => assistant.num_chunks === 0);
   }
 
-  const hasOpenAIProvider = llmProviders.some(
-    (provider) => provider.provider === "openai"
+  const hasImageCompatibleModel = llmProviders.some(
+    (provider) =>
+      provider.provider === "openai" ||
+      provider.model_names.some((model) => checkLLMSupportsImageInput(model))
   );
-  if (!hasOpenAIProvider) {
+
+  if (!hasImageCompatibleModel) {
     assistants = assistants.filter(
       (assistant) =>
         !assistant.tools.some(
@@ -235,5 +253,7 @@ export async function fetchChatData(searchParams: {
     toggleSidebar,
     shouldShowWelcomeModal,
     userInputPrompts,
+    hasAnyConnectors,
+    hasImageCompatibleModel,
   };
 }

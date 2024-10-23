@@ -1,4 +1,6 @@
 from collections.abc import Sequence
+from datetime import datetime
+from datetime import timezone
 
 from sqlalchemy import and_
 from sqlalchemy import delete
@@ -19,8 +21,6 @@ from danswer.db.models import SearchSettings
 from danswer.server.documents.models import ConnectorCredentialPair
 from danswer.server.documents.models import ConnectorCredentialPairIdentifier
 from danswer.utils.logger import setup_logger
-from danswer.utils.telemetry import optional_telemetry
-from danswer.utils.telemetry import RecordType
 
 logger = setup_logger()
 
@@ -66,7 +66,7 @@ def create_index_attempt(
     return new_attempt.id
 
 
-def get_inprogress_index_attempts(
+def get_in_progress_index_attempts(
     connector_id: int | None,
     db_session: Session,
 ) -> list[IndexAttempt]:
@@ -81,13 +81,15 @@ def get_inprogress_index_attempts(
     return list(incomplete_attempts.all())
 
 
-def get_not_started_index_attempts(db_session: Session) -> list[IndexAttempt]:
+def get_all_index_attempts_by_status(
+    status: IndexingStatus, db_session: Session
+) -> list[IndexAttempt]:
     """This eagerly loads the connector and credential so that the db_session can be expired
     before running long-living indexing jobs, which causes increasing memory usage.
 
     Results are ordered by time_created (oldest to newest)."""
     stmt = select(IndexAttempt)
-    stmt = stmt.where(IndexAttempt.status == IndexingStatus.NOT_STARTED)
+    stmt = stmt.where(IndexAttempt.status == status)
     stmt = stmt.order_by(IndexAttempt.time_created)
     stmt = stmt.options(
         joinedload(IndexAttempt.connector_credential_pair).joinedload(
@@ -101,31 +103,92 @@ def get_not_started_index_attempts(db_session: Session) -> list[IndexAttempt]:
     return list(new_attempts.all())
 
 
+def transition_attempt_to_in_progress(
+    index_attempt_id: int,
+    db_session: Session,
+) -> IndexAttempt:
+    """Locks the row when we try to update"""
+    try:
+        attempt = db_session.execute(
+            select(IndexAttempt)
+            .where(IndexAttempt.id == index_attempt_id)
+            .with_for_update()
+        ).scalar_one()
+
+        if attempt is None:
+            raise RuntimeError(
+                f"Unable to find IndexAttempt for ID '{index_attempt_id}'"
+            )
+
+        if attempt.status != IndexingStatus.NOT_STARTED:
+            raise RuntimeError(
+                f"Indexing attempt with ID '{index_attempt_id}' is not in NOT_STARTED status. "
+                f"Current status is '{attempt.status}'."
+            )
+
+        attempt.status = IndexingStatus.IN_PROGRESS
+        attempt.time_started = attempt.time_started or func.now()  # type: ignore
+        db_session.commit()
+        return attempt
+    except Exception:
+        db_session.rollback()
+        logger.exception("transition_attempt_to_in_progress exceptioned.")
+        raise
+
+
 def mark_attempt_in_progress(
     index_attempt: IndexAttempt,
     db_session: Session,
 ) -> None:
-    index_attempt.status = IndexingStatus.IN_PROGRESS
-    index_attempt.time_started = index_attempt.time_started or func.now()  # type: ignore
-    db_session.commit()
+    try:
+        attempt = db_session.execute(
+            select(IndexAttempt)
+            .where(IndexAttempt.id == index_attempt.id)
+            .with_for_update()
+        ).scalar_one()
+
+        attempt.status = IndexingStatus.IN_PROGRESS
+        attempt.time_started = index_attempt.time_started or func.now()  # type: ignore
+        db_session.commit()
+    except Exception:
+        db_session.rollback()
+        raise
 
 
 def mark_attempt_succeeded(
     index_attempt: IndexAttempt,
     db_session: Session,
 ) -> None:
-    index_attempt.status = IndexingStatus.SUCCESS
-    db_session.add(index_attempt)
-    db_session.commit()
+    try:
+        attempt = db_session.execute(
+            select(IndexAttempt)
+            .where(IndexAttempt.id == index_attempt.id)
+            .with_for_update()
+        ).scalar_one()
+
+        attempt.status = IndexingStatus.SUCCESS
+        db_session.commit()
+    except Exception:
+        db_session.rollback()
+        raise
 
 
 def mark_attempt_partially_succeeded(
     index_attempt: IndexAttempt,
     db_session: Session,
 ) -> None:
-    index_attempt.status = IndexingStatus.COMPLETED_WITH_ERRORS
-    db_session.add(index_attempt)
-    db_session.commit()
+    try:
+        attempt = db_session.execute(
+            select(IndexAttempt)
+            .where(IndexAttempt.id == index_attempt.id)
+            .with_for_update()
+        ).scalar_one()
+
+        attempt.status = IndexingStatus.COMPLETED_WITH_ERRORS
+        db_session.commit()
+    except Exception:
+        db_session.rollback()
+        raise
 
 
 def mark_attempt_failed(
@@ -134,14 +197,22 @@ def mark_attempt_failed(
     failure_reason: str = "Unknown",
     full_exception_trace: str | None = None,
 ) -> None:
-    index_attempt.status = IndexingStatus.FAILED
-    index_attempt.error_msg = failure_reason
-    index_attempt.full_exception_trace = full_exception_trace
-    db_session.add(index_attempt)
-    db_session.commit()
+    try:
+        attempt = db_session.execute(
+            select(IndexAttempt)
+            .where(IndexAttempt.id == index_attempt.id)
+            .with_for_update()
+        ).scalar_one()
 
-    source = index_attempt.connector_credential_pair.connector.source
-    optional_telemetry(record_type=RecordType.FAILURE, data={"connector": source})
+        if not attempt.time_started:
+            attempt.time_started = datetime.now(timezone.utc)
+        attempt.status = IndexingStatus.FAILED
+        attempt.error_msg = failure_reason
+        attempt.full_exception_trace = full_exception_trace
+        db_session.commit()
+    except Exception:
+        db_session.rollback()
+        raise
 
 
 def update_docs_indexed(
@@ -435,14 +506,13 @@ def cancel_indexing_attempts_for_ccpair(
 
     db_session.execute(stmt)
 
-    db_session.commit()
-
 
 def cancel_indexing_attempts_past_model(
     db_session: Session,
 ) -> None:
     """Stops all indexing attempts that are in progress or not started for
     any embedding model that not present/future"""
+
     db_session.execute(
         update(IndexAttempt)
         .where(
@@ -454,8 +524,6 @@ def cancel_indexing_attempts_past_model(
         )
         .values(status=IndexingStatus.FAILED)
     )
-
-    db_session.commit()
 
 
 def count_unique_cc_pairs_with_successful_index_attempts(

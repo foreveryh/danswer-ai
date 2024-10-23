@@ -50,14 +50,8 @@ function Main({ ccPairId }: { ccPairId: number }) {
   const { popup, setPopup } = usePopup();
 
   const finishConnectorDeletion = useCallback(() => {
-    setPopup({
-      message: "Connector deleted successfully",
-      type: "success",
-    });
-    setTimeout(() => {
-      router.push("/admin/indexing/status");
-    }, 2000);
-  }, [router, setPopup]);
+    router.push("/admin/indexing/status?message=connector-deleted");
+  }, [router]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -80,14 +74,7 @@ function Main({ ccPairId }: { ccPairId: number }) {
     ) {
       finishConnectorDeletion();
     }
-  }, [
-    isLoading,
-    ccPair,
-    error,
-    hasLoadedOnce,
-    router,
-    finishConnectorDeletion,
-  ]);
+  }, [isLoading, ccPair, error, hasLoadedOnce, finishConnectorDeletion]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEditableName(e.target.value);
@@ -153,7 +140,9 @@ function Main({ ccPairId }: { ccPairId: number }) {
   return (
     <>
       {popup}
-      <BackButton />
+      <BackButton
+        behaviorOverride={() => router.push("/admin/indexing/status")}
+      />
       <div className="pb-1 flex mt-1">
         <div className="mr-2 my-auto">
           <SourceIcon iconSize={24} sourceType={ccPair.connector.source} />
@@ -199,8 +188,10 @@ function Main({ ccPairId }: { ccPairId: number }) {
                 connectorId={ccPair.connector.id}
                 credentialId={ccPair.credential.id}
                 isDisabled={
+                  ccPair.indexing ||
                   ccPair.status === ConnectorCredentialPairStatus.PAUSED
                 }
+                isIndexing={ccPair.indexing}
                 isDeleting={isDeleting}
               />
             )}

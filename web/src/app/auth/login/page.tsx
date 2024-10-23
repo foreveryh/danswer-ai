@@ -11,9 +11,9 @@ import { SignInButton } from "./SignInButton";
 import { EmailPasswordForm } from "./EmailPasswordForm";
 import { Card, Title, Text } from "@tremor/react";
 import Link from "next/link";
-import { Logo } from "@/components/Logo";
 import { LoginText } from "./LoginText";
 import { getSecondsUntilExpiration } from "@/lib/time";
+import AuthFlowContainer from "@/components/auth/AuthFlowContainer";
 
 const Page = async ({
   searchParams,
@@ -36,6 +36,10 @@ const Page = async ({
     console.log(`Some fetch failed for the login page - ${e}`);
   }
 
+  const nextUrl = Array.isArray(searchParams?.next)
+    ? searchParams?.next[0]
+    : searchParams?.next || null;
+
   // simply take the user to the home page if Auth is disabled
   if (authTypeMetadata?.authType === "disabled") {
     return redirect("/");
@@ -51,7 +55,6 @@ const Page = async ({
     if (authTypeMetadata?.requiresVerification && !currentUser.is_verified) {
       return redirect("/auth/waiting-on-verification");
     }
-
     return redirect("/");
   }
 
@@ -59,7 +62,7 @@ const Page = async ({
   let authUrl: string | null = null;
   if (authTypeMetadata) {
     try {
-      authUrl = await getAuthUrlSS(authTypeMetadata.authType);
+      authUrl = await getAuthUrlSS(authTypeMetadata.authType, nextUrl!);
     } catch (e) {
       console.log(`Some fetch failed for the login page - ${e}`);
     }
@@ -70,46 +73,65 @@ const Page = async ({
   }
 
   return (
-    <main>
+    <AuthFlowContainer>
       <div className="absolute top-10x w-full">
         <HealthCheckBanner />
       </div>
-      <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div>
-          <Logo height={64} width={64} className="mx-auto w-fit" />
-          {authUrl && authTypeMetadata && (
-            <>
-              <h2 className="text-center text-xl text-strong font-bold mt-6">
-                <LoginText />
-              </h2>
 
-              <SignInButton
-                authorizeUrl={authUrl}
-                authType={authTypeMetadata?.authType}
-              />
-            </>
-          )}
-          {authTypeMetadata?.authType === "basic" && (
-            <Card className="mt-4 w-96">
-              <div className="flex">
-                <Title className="mb-2 mx-auto font-bold">
-                  <LoginText />
-                </Title>
-              </div>
-              <EmailPasswordForm />
-              <div className="flex">
-                <Text className="mt-4 mx-auto">
-                  Don&apos;t have an account?{" "}
-                  <Link href="/auth/signup" className="text-link font-medium">
-                    Create an account
-                  </Link>
-                </Text>
-              </div>
-            </Card>
-          )}
-        </div>
+      <div className="flex flex-col w-full justify-center">
+        {authUrl && authTypeMetadata && (
+          <>
+            <h2 className="text-center text-xl text-strong font-bold">
+              <LoginText />
+            </h2>
+
+            <SignInButton
+              authorizeUrl={authUrl}
+              authType={authTypeMetadata?.authType}
+            />
+          </>
+        )}
+
+        {authTypeMetadata?.authType === "cloud" && (
+          <div className="mt-4 w-full justify-center">
+            <div className="flex items-center w-full my-4">
+              <div className="flex-grow border-t border-gray-300"></div>
+              <span className="px-4 text-gray-500">or</span>
+              <div className="flex-grow border-t border-gray-300"></div>
+            </div>
+            <EmailPasswordForm shouldVerify={true} />
+
+            <div className="flex">
+              <Text className="mt-4 mx-auto">
+                Don&apos;t have an account?{" "}
+                <Link href="/auth/signup" className="text-link font-medium">
+                  Create an account
+                </Link>
+              </Text>
+            </div>
+          </div>
+        )}
+
+        {authTypeMetadata?.authType === "basic" && (
+          <Card className="mt-4 w-96">
+            <div className="flex">
+              <Title className="mb-2 mx-auto font-bold">
+                <LoginText />
+              </Title>
+            </div>
+            <EmailPasswordForm />
+            <div className="flex">
+              <Text className="mt-4 mx-auto">
+                Don&apos;t have an account?{" "}
+                <Link href="/auth/signup" className="text-link font-medium">
+                  Create an account
+                </Link>
+              </Text>
+            </div>
+          </Card>
+        )}
       </div>
-    </main>
+    </AuthFlowContainer>
   );
 };
 

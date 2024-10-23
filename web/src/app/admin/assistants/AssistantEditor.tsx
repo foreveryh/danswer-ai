@@ -26,7 +26,7 @@ import { getDisplayNameForModel } from "@/lib/hooks";
 import { DocumentSetSelectable } from "@/components/documentSet/DocumentSetSelectable";
 import { Option } from "@/components/Dropdown";
 import { addAssistantToList } from "@/lib/assistants/updateAssistantPreferences";
-import { checkLLMSupportsImageOutput, destructureValue } from "@/lib/llm/utils";
+import { checkLLMSupportsImageInput, destructureValue } from "@/lib/llm/utils";
 import { ToolSnapshot } from "@/lib/tools/interfaces";
 import { checkUserIsNoAuthUser } from "@/lib/user";
 
@@ -192,15 +192,11 @@ export function AssistantEditor({
     modelOptionsByProvider.set(llmProvider.name, providerOptions);
   });
 
-  const providerSupportingImageGenerationExists =
-    providersContainImageGeneratingSupport(llmProviders);
-
   const personaCurrentToolIds =
     existingPersona?.tools.map((tool) => tool.id) || [];
+
   const searchTool = findSearchTool(tools);
-  const imageGenerationTool = providerSupportingImageGenerationExists
-    ? findImageGenerationTool(tools)
-    : undefined;
+  const imageGenerationTool = findImageGenerationTool(tools);
   const internetSearchTool = findInternetSearchTool(tools);
 
   const customTools = tools.filter(
@@ -349,12 +345,9 @@ export function AssistantEditor({
 
           if (imageGenerationToolEnabled) {
             if (
-              !checkLLMSupportsImageOutput(
-                providerDisplayNameToProviderName.get(
-                  values.llm_model_provider_override || ""
-                ) ||
-                  defaultProviderName ||
-                  "",
+              // model must support image input for image generation
+              // to work
+              !checkLLMSupportsImageInput(
                 values.llm_model_version_override || defaultModelName || ""
               )
             ) {
@@ -469,12 +462,9 @@ export function AssistantEditor({
               : false;
           }
 
-          const currentLLMSupportsImageOutput = checkLLMSupportsImageOutput(
-            providerDisplayNameToProviderName.get(
-              values.llm_model_provider_override || ""
-            ) ||
-              defaultProviderName ||
-              "",
+          // model must support image input for image generation
+          // to work
+          const currentLLMSupportsImageOutput = checkLLMSupportsImageInput(
             values.llm_model_version_override || defaultModelName || ""
           );
 
@@ -1003,7 +993,7 @@ export function AssistantEditor({
                           alignTop={tool.description != null}
                           key={tool.id}
                           name={`enabled_tools_map.${tool.id}`}
-                          label={tool.name}
+                          label={tool.display_name}
                           subtext={tool.description}
                           onChange={() => {
                             toggleToolInValues(tool.id);

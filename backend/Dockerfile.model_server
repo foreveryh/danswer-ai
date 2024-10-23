@@ -7,7 +7,7 @@ You can find it at https://hub.docker.com/r/danswer/danswer-model-server. For mo
 visit https://github.com/danswer-ai/danswer."
 
 # Default DANSWER_VERSION, typically overriden during builds by GitHub Actions.
-ARG DANSWER_VERSION=0.3-dev
+ARG DANSWER_VERSION=0.8-dev
 ENV DANSWER_VERSION=${DANSWER_VERSION} \
     DANSWER_RUNNING_IN_DOCKER="true"
 
@@ -67,6 +67,6 @@ COPY ./shared_configs /app/shared_configs
 # Model Server main code
 COPY ./model_server /app/model_server
 
-ENV PYTHONPATH /app
+ENV PYTHONPATH=/app
 
 CMD ["uvicorn", "model_server.main:app", "--host", "0.0.0.0", "--port", "9000"]

@@ -83,6 +83,7 @@ def upsert_llm_provider(
     existing_llm_provider.model_names = llm_provider.model_names
     existing_llm_provider.is_public = llm_provider.is_public
     existing_llm_provider.display_model_names = llm_provider.display_model_names
+    existing_llm_provider.deployment_name = llm_provider.deployment_name
 
     if not existing_llm_provider.id:
         # If its not already in the db, we need to generate an ID by flushing
@@ -94,10 +95,11 @@ def upsert_llm_provider(
         group_ids=llm_provider.groups,
         db_session=db_session,
     )
+    full_llm_provider = FullLLMProvider.from_model(existing_llm_provider)
 
     db_session.commit()
 
-    return FullLLMProvider.from_model(existing_llm_provider)
+    return full_llm_provider
 
 
 def fetch_existing_embedding_providers(

@@ -109,7 +109,7 @@ def _convert_message_to_dict(message: BaseMessage) -> dict:
                         "arguments": json.dumps(tool_call["args"]),
                     },
                     "type": "function",
-                    "index": 0,  # only support a single tool call atm
+                    "index": tool_call.get("index", 0),
                 }
                 for tool_call in message.tool_calls
             ]
@@ -158,12 +158,13 @@ def _convert_delta_to_message_chunk(
         if tool_calls:
             tool_call = tool_calls[0]
             tool_name = tool_call.function.name or (curr_msg and curr_msg.name) or ""
+            idx = tool_call.index
 
             tool_call_chunk = ToolCallChunk(
                 name=tool_name,
                 id=tool_call.id,
                 args=tool_call.function.arguments,
-                index=0,  # only support a single tool call atm
+                index=idx,
             )
 
             return AIMessageChunk(
@@ -204,6 +205,7 @@ class DefaultMultiLLM(LLM):
         model_name: str,
         api_base: str | None = None,
         api_version: str | None = None,
+        deployment_name: str | None = None,
         max_output_tokens: int | None = None,
         custom_llm_provider: str | None = None,
         temperature: float = GEN_AI_TEMPERATURE,
@@ -215,6 +217,7 @@ class DefaultMultiLLM(LLM):
         self._model_version = model_name
         self._temperature = temperature
         self._api_key = api_key
+        self._deployment_name = deployment_name
         self._api_base = api_base
         self._api_version = api_version
         self._custom_llm_provider = custom_llm_provider
@@ -290,7 +293,7 @@ class DefaultMultiLLM(LLM):
         try:
             return litellm.completion(
                 # model choice
-                model=f"{self.config.model_provider}/{self.config.model_name}",
+                model=f"{self.config.model_provider}/{self.config.deployment_name or self.config.model_name}",
                 # NOTE: have to pass in None instead of empty string for these
                 # otherwise litellm can have some issues with bedrock
                 api_key=self._api_key or None,
@@ -325,6 +328,7 @@ class DefaultMultiLLM(LLM):
             api_key=self._api_key,
             api_base=self._api_base,
             api_version=self._api_version,
+            deployment_name=self._deployment_name,
         )
 
     def _invoke_implementation(

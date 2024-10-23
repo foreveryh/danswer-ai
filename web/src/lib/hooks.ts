@@ -1,3 +1,4 @@
+"use client";
 import {
   ConnectorIndexingStatus,
   DocumentBoostStatus,
@@ -6,14 +7,14 @@ import {
 } from "@/lib/types";
 import useSWR, { mutate, useSWRConfig } from "swr";
 import { errorHandlingFetcher } from "./fetcher";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { DateRangePickerValue } from "@tremor/react";
 import { SourceMetadata } from "./search/interfaces";
 import { destructureValue } from "./llm/utils";
 import { ChatSession } from "@/app/chat/interfaces";
 import { UsersResponse } from "./users/interfaces";
-import { usePaidEnterpriseFeaturesEnabled } from "@/components/settings/usePaidEnterpriseFeaturesEnabled";
 import { Credential } from "./connectors/credentials";
+import { SettingsContext } from "@/components/settings/SettingsProvider";
 
 const CREDENTIAL_URL = "/api/manage/admin/credential";
 
@@ -220,8 +221,14 @@ export const useUserGroups = (): {
   error: string;
   refreshUserGroups: () => void;
 } => {
-  const swrResponse = useSWR<UserGroup[]>(USER_GROUP_URL, errorHandlingFetcher);
-  const isPaidEnterpriseFeaturesEnabled = usePaidEnterpriseFeaturesEnabled();
+  const combinedSettings = useContext(SettingsContext);
+  const isPaidEnterpriseFeaturesEnabled =
+    combinedSettings && combinedSettings.enterpriseSettings !== null;
+
+  const swrResponse = useSWR<UserGroup[]>(
+    isPaidEnterpriseFeaturesEnabled ? USER_GROUP_URL : null,
+    errorHandlingFetcher
+  );
 
   if (!isPaidEnterpriseFeaturesEnabled) {
     return {
@@ -276,6 +283,10 @@ const MODEL_DISPLAY_NAMES: { [key: string]: string } = {
   "meta.llama3-1-70b-instruct-v1:0": "Llama 3.1 70B",
   "meta.llama3-1-8b-instruct-v1:0": "Llama 3.1 8B",
   "meta.llama3-70b-instruct-v1:0": "Llama 3 70B",
+  "meta.llama3-2-1b-instruct-v1:0": "Llama 3.2 1B",
+  "meta.llama3-2-3b-instruct-v1:0": "Llama 3.2 3B",
+  "meta.llama3-2-11b-instruct-v1:0": "Llama 3.2 11B",
+  "meta.llama3-2-90b-instruct-v1:0": "Llama 3.2 90B",
   "meta.llama3-8b-instruct-v1:0": "Llama 3 8B",
   "meta.llama2-70b-chat-v1": "Llama 2 70B",
   "meta.llama2-13b-chat-v1": "Llama 2 13B",

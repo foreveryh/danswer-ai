@@ -83,6 +83,15 @@ const MODEL_NAMES_SUPPORTING_IMAGE_INPUT = [
   "anthropic.claude-3-sonnet-20240229-v1:0",
   "anthropic.claude-3-haiku-20240307-v1:0",
   "anthropic.claude-3-5-sonnet-20240620-v1:0",
+  //LLama3
+  "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo",
+  "meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo",
+  //Qwen2
+  "qwen/qwen-2-vl-72b-instruct",
+  //Gemini
+  "google/gemini-pro-vision",
+  //LLava
+  "liuhaotian/llava-yi-34b"
 ];
 
 export function checkLLMSupportsImageInput(model: string) {

@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Session
 
-from danswer.configs.app_configs import MULTI_TENANT
 from danswer.configs.chat_configs import BASE_RECENCY_DECAY
 from danswer.configs.chat_configs import CONTEXT_CHUNKS_ABOVE
 from danswer.configs.chat_configs import CONTEXT_CHUNKS_BELOW
@@ -10,7 +9,7 @@ from danswer.configs.chat_configs import HYBRID_ALPHA
 from danswer.configs.chat_configs import HYBRID_ALPHA_KEYWORD
 from danswer.configs.chat_configs import NUM_POSTPROCESSED_RESULTS
 from danswer.configs.chat_configs import NUM_RETURNED_HITS
-from danswer.db.engine import current_tenant_id
+from danswer.db.engine import CURRENT_TENANT_ID_CONTEXTVAR
 from danswer.db.models import User
 from danswer.db.search_settings import get_current_search_settings
 from danswer.llm.interfaces import LLM
@@ -31,6 +30,7 @@ from danswer.utils.logger import setup_logger
 from danswer.utils.threadpool_concurrency import FunctionCall
 from danswer.utils.threadpool_concurrency import run_functions_in_parallel
 from danswer.utils.timing import log_function_time
+from shared_configs.configs import MULTI_TENANT
 
 
 logger = setup_logger()
@@ -162,7 +162,7 @@ def retrieval_preprocessing(
         time_cutoff=time_filter or predicted_time_cutoff,
         tags=preset_filters.tags,  # Tags are never auto-extracted
         access_control_list=user_acl_filters,
-        tenant_id=current_tenant_id.get() if MULTI_TENANT else None,
+        tenant_id=CURRENT_TENANT_ID_CONTEXTVAR.get() if MULTI_TENANT else None,
     )
 
     llm_evaluation_type = LLMEvaluationType.BASIC

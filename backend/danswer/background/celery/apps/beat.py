@@ -21,6 +21,8 @@ celery_app.config_from_object("danswer.background.celery.configs.beat")
 @beat_init.connect
 def on_beat_init(sender: Any, **kwargs: Any) -> None:
     logger.info("beat_init signal received.")
+
+    # celery beat shouldn't touch the db at all. But just setting a low minimum here.
     SqlEngine.set_app_name(POSTGRES_CELERY_BEAT_APP_NAME)
     SqlEngine.init_engine(pool_size=2, max_overflow=0)
     app_base.wait_for_redis(sender, **kwargs)
@@ -78,6 +80,7 @@ tasks_to_schedule = [
     },
 ]
 
+
 # Build the celery beat schedule dynamically
 beat_schedule = {}
 
@@ -88,7 +91,7 @@ for tenant_id in tenant_ids:
             "task": task["task"],
             "schedule": task["schedule"],
             "options": task["options"],
-            "args": (tenant_id,),  # Must pass tenant_id as an argument
+            "kwargs": {"tenant_id": tenant_id},  # Must pass tenant_id as an argument
         }
 
 # Include any existing beat schedules

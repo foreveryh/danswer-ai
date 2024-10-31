@@ -30,15 +30,15 @@ from danswer.auth.schemas import UserStatus
 from danswer.auth.users import current_admin_user
 from danswer.auth.users import current_curator_or_admin_user
 from danswer.auth.users import current_user
+from danswer.auth.users import get_tenant_id_for_email
 from danswer.auth.users import optional_user
 from danswer.configs.app_configs import AUTH_TYPE
 from danswer.configs.app_configs import ENABLE_EMAIL_INVITES
-from danswer.configs.app_configs import MULTI_TENANT
 from danswer.configs.app_configs import SESSION_EXPIRE_TIME_SECONDS
 from danswer.configs.app_configs import VALID_EMAIL_DOMAINS
 from danswer.configs.constants import AuthType
 from danswer.db.auth import get_total_users
-from danswer.db.engine import current_tenant_id
+from danswer.db.engine import CURRENT_TENANT_ID_CONTEXTVAR
 from danswer.db.engine import get_session
 from danswer.db.models import AccessToken
 from danswer.db.models import DocumentSet__User
@@ -66,6 +66,7 @@ from ee.danswer.db.user_group import remove_curator_status__no_commit
 from ee.danswer.server.tenants.billing import register_tenant_users
 from ee.danswer.server.tenants.provisioning import add_users_to_tenant
 from ee.danswer.server.tenants.provisioning import remove_users_from_tenant
+from shared_configs.configs import MULTI_TENANT
 
 logger = setup_logger()
 
@@ -188,7 +189,7 @@ def bulk_invite_users(
             status_code=400, detail="Auth is disabled, cannot invite users"
         )
 
-    tenant_id = current_tenant_id.get()
+    tenant_id = CURRENT_TENANT_ID_CONTEXTVAR.get()
 
     normalized_emails = []
     try:
@@ -222,7 +223,9 @@ def bulk_invite_users(
         return number_of_invited_users
     try:
         logger.info("Registering tenant users")
-        register_tenant_users(current_tenant_id.get(), get_total_users(db_session))
+        register_tenant_users(
+            CURRENT_TENANT_ID_CONTEXTVAR.get(), get_total_users(db_session)
+        )
         if ENABLE_EMAIL_INVITES:
             try:
                 for email in all_emails:
@@ -250,13 +253,15 @@ def remove_invited_user(
     user_emails = get_invited_users()
     remaining_users = [user for user in user_emails if user != user_email.user_email]
 
-    tenant_id = current_tenant_id.get()
+    tenant_id = CURRENT_TENANT_ID_CONTEXTVAR.get()
     remove_users_from_tenant([user_email.user_email], tenant_id)
     number_of_invited_users = write_invited_users(remaining_users)
 
     try:
         if MULTI_TENANT:
-            register_tenant_users(current_tenant_id.get(), get_total_users(db_session))
+            register_tenant_users(
+                CURRENT_TENANT_ID_CONTEXTVAR.get(), get_total_users(db_session)
+            )
     except Exception:
         logger.error(
             "Request to update number of seats taken in control plane failed. "
@@ -489,10 +494,13 @@ def verify_user_logged_in(
     token_created_at = (
         None if MULTI_TENANT else get_current_token_creation(user, db_session)
     )
+    organization_name = get_tenant_id_for_email(user.email)
+
     user_info = UserInfo.from_model(
         user,
         current_token_created_at=token_created_at,
         expiry_length=SESSION_EXPIRE_TIME_SECONDS,
+        organization_name=organization_name,
     )
 
     return user_info

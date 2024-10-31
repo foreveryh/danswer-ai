@@ -5,7 +5,6 @@ from fastapi import HTTPException
 
 from danswer.auth.users import current_admin_user
 from danswer.auth.users import User
-from danswer.configs.app_configs import MULTI_TENANT
 from danswer.configs.app_configs import WEB_DOMAIN
 from danswer.db.engine import get_session_with_tenant
 from danswer.db.notification import create_notification
@@ -24,7 +23,8 @@ from ee.danswer.server.tenants.provisioning import add_users_to_tenant
 from ee.danswer.server.tenants.provisioning import ensure_schema_exists
 from ee.danswer.server.tenants.provisioning import run_alembic_migrations
 from ee.danswer.server.tenants.provisioning import user_owns_a_tenant
-from shared_configs.configs import current_tenant_id
+from shared_configs.configs import CURRENT_TENANT_ID_CONTEXTVAR
+from shared_configs.configs import MULTI_TENANT
 
 
 stripe.api_key = STRIPE_SECRET_KEY
@@ -55,11 +55,11 @@ def create_tenant(
         else:
             logger.info(f"Schema already exists for tenant {tenant_id}")
 
-        token = current_tenant_id.set(tenant_id)
+        token = CURRENT_TENANT_ID_CONTEXTVAR.set(tenant_id)
         run_alembic_migrations(tenant_id)
 
         with get_session_with_tenant(tenant_id) as db_session:
-            setup_danswer(db_session)
+            setup_danswer(db_session, tenant_id)
 
         add_users_to_tenant([email], tenant_id)
 
@@ -74,7 +74,7 @@ def create_tenant(
         )
     finally:
         if token is not None:
-            current_tenant_id.reset(token)
+            CURRENT_TENANT_ID_CONTEXTVAR.reset(token)
 
 
 @router.post("/product-gating")
@@ -89,7 +89,7 @@ def gate_product(
     2) User's card has declined
     """
     tenant_id = product_gating_request.tenant_id
-    token = current_tenant_id.set(tenant_id)
+    token = CURRENT_TENANT_ID_CONTEXTVAR.set(tenant_id)
 
     settings = load_settings()
     settings.product_gating = product_gating_request.product_gating
@@ -100,7 +100,7 @@ def gate_product(
             create_notification(None, product_gating_request.notification, db_session)
 
     if token is not None:
-        current_tenant_id.reset(token)
+        CURRENT_TENANT_ID_CONTEXTVAR.reset(token)
 
 
 @router.get("/billing-information", response_model=BillingInformation)
@@ -108,14 +108,16 @@ async def billing_information(
     _: User = Depends(current_admin_user),
 ) -> BillingInformation:
     logger.info("Fetching billing information")
-    return BillingInformation(**fetch_billing_information(current_tenant_id.get()))
+    return BillingInformation(
+        **fetch_billing_information(CURRENT_TENANT_ID_CONTEXTVAR.get())
+    )
 
 
 @router.post("/create-customer-portal-session")
 async def create_customer_portal_session(_: User = Depends(current_admin_user)) -> dict:
     try:
         # Fetch tenant_id and current tenant's information
-        tenant_id = current_tenant_id.get()
+        tenant_id = CURRENT_TENANT_ID_CONTEXTVAR.get()
         stripe_info = fetch_tenant_stripe_information(tenant_id)
         stripe_customer_id = stripe_info.get("stripe_customer_id")
         if not stripe_customer_id:

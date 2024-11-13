@@ -12,18 +12,15 @@ import { Metadata } from "next";
 import { buildClientUrl } from "@/lib/utilsSS";
 import { Inter } from "next/font/google";
 import { EnterpriseSettings, GatingType } from "./admin/settings/interfaces";
-import { Card } from "@tremor/react";
 import { HeaderTitle } from "@/components/header/HeaderTitle";
 import { Logo } from "@/components/Logo";
 import { fetchAssistantData } from "@/lib/chat/fetchAssistantdata";
 import { AppProvider } from "@/components/context/AppProvider";
 import { PHProvider } from "./providers";
-import { default as dynamicImport } from "next/dynamic";
 import { getCurrentUserSS } from "@/lib/userSS";
-
-const PostHogPageView = dynamicImport(() => import("./PostHogPageView"), {
-  ssr: false,
-});
+import CardSection from "@/components/admin/CardSection";
+import { Suspense } from "react";
+import PostHogPageView from "./PostHogPageView";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -104,7 +101,7 @@ export default async function RootLayout({
           <Logo height={40} width={40} />
         </div>
 
-        <Card className="p-8 max-w-md">
+        <CardSection className="max-w-md">
           <h1 className="text-2xl font-bold mb-4 text-error">Error</h1>
           <p className="text-text-500">
             Your Danswer instance was not configured properly and your settings
@@ -137,7 +134,7 @@ export default async function RootLayout({
             </a>
             .
           </p>
-        </Card>
+        </CardSection>
       </div>
     );
   }
@@ -148,7 +145,7 @@ export default async function RootLayout({
           <HeaderTitle>Danswer</HeaderTitle>
           <Logo height={40} width={40} />
         </div>
-        <Card className="p-8 max-w-md">
+        <CardSection className="w-full max-w-md">
           <h1 className="text-2xl font-bold mb-4 text-error">
             Access Restricted
           </h1>
@@ -165,7 +162,7 @@ export default async function RootLayout({
             billing section. For other users, please reach out to your
             administrator to address this matter.
           </p>
-        </Card>
+        </CardSection>
       </div>
     );
   }
@@ -181,7 +178,9 @@ export default async function RootLayout({
       hasAnyConnectors={hasAnyConnectors}
       hasImageCompatibleModel={hasImageCompatibleModel}
     >
-      <PostHogPageView />
+      <Suspense fallback={null}>
+        <PostHogPageView />
+      </Suspense>
       {children}
     </AppProvider>
   );

@@ -33,8 +33,8 @@ from danswer.document_index.factory import get_default_document_index
 from danswer.indexing.embedder import DefaultIndexingEmbedder
 from danswer.indexing.indexing_heartbeat import IndexingHeartbeat
 from danswer.indexing.indexing_pipeline import build_indexing_pipeline
-from danswer.utils.logger import IndexAttemptSingleton
 from danswer.utils.logger import setup_logger
+from danswer.utils.logger import TaskAttemptSingleton
 from danswer.utils.variable_functionality import global_version
 
 logger = setup_logger()
@@ -118,7 +118,13 @@ def _run_indexing(
     """
     start_time = time.time()
 
+    if index_attempt.search_settings is None:
+        raise ValueError(
+            "Search settings must be set for indexing. This should not be possible."
+        )
+
     search_settings = index_attempt.search_settings
+
     index_name = search_settings.index_name
 
     # Only update cc-pair status for primary index jobs
@@ -331,7 +337,7 @@ def _run_indexing(
                 or index_attempt.status != IndexingStatus.IN_PROGRESS
             ):
                 mark_attempt_failed(
-                    index_attempt,
+                    index_attempt.id,
                     db_session,
                     failure_reason=str(e),
                     full_exception_trace=traceback.format_exc(),
@@ -366,7 +372,7 @@ def _run_indexing(
         and index_attempt_md.num_exceptions >= batch_num
     ):
         mark_attempt_failed(
-            index_attempt,
+            index_attempt.id,
             db_session,
             failure_reason="All batches exceptioned.",
         )
@@ -421,7 +427,7 @@ def run_indexing_entrypoint(
 
         # set the indexing attempt ID so that all log messages from this process
         # will have it added as a prefix
-        IndexAttemptSingleton.set_cc_and_index_id(
+        TaskAttemptSingleton.set_cc_and_index_id(
             index_attempt_id, connector_credential_pair_id
         )
         with get_session_with_tenant(tenant_id) as db_session:

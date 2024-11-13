@@ -3,7 +3,9 @@
 import { generateRandomIconShape, createSVG } from "@/lib/assistantIconUtils";
 
 import { CCPairBasicInfo, DocumentSet, User } from "@/lib/types";
-import { Button, Divider, Italic } from "@tremor/react";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { IsPublicGroupSelector } from "@/components/IsPublicGroupSelector";
 import {
   ArrayHelpers,
@@ -35,17 +37,17 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@radix-ui/react-tooltip";
+} from "@/components/ui/tooltip";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { FiInfo, FiPlus, FiX } from "react-icons/fi";
+import { FiInfo, FiX } from "react-icons/fi";
 import * as Yup from "yup";
 import { FullLLMProvider } from "../configuration/llm/interfaces";
 import CollapsibleSection from "./CollapsibleSection";
 import { SuccessfulPersonaUpdateRedirectType } from "./enums";
 import { Persona, StarterMessage } from "./interfaces";
-import { buildFinalPrompt, createPersona, updatePersona } from "./lib";
+import { createPersona, updatePersona } from "./lib";
 import { Popover } from "@/components/popover/Popover";
 import {
   CameraIcon,
@@ -243,9 +245,6 @@ export function AssistantEditor({
               Yup.object().shape({
                 name: Yup.string().required(
                   "Each starter message must have a name"
-                ),
-                description: Yup.string().required(
-                  "Each starter message must have a description"
                 ),
                 message: Yup.string().required(
                   "Each starter message must have a message"
@@ -564,15 +563,13 @@ export function AssistantEditor({
                   align="start"
                   side="bottom"
                 />
-                <TooltipProvider delayDuration={50}>
+                <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger>
                       <FiInfo size={12} />
                     </TooltipTrigger>
                     <TooltipContent side="top" align="center">
-                      <p className="bg-background-900 max-w-[200px] mb-1 text-sm rounded-lg p-1.5 text-white">
-                        This icon will visually represent your Assistant
-                      </p>
+                      This icon will visually represent your Assistant
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -608,16 +605,14 @@ export function AssistantEditor({
                   <div className="block  font-medium text-base">
                     Default AI Model{" "}
                   </div>
-                  <TooltipProvider delayDuration={50}>
+                  <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
                         <FiInfo size={12} />
                       </TooltipTrigger>
                       <TooltipContent side="top" align="center">
-                        <p className="bg-background-900 max-w-[200px] mb-1 text-sm rounded-lg p-1.5 text-white">
-                          Select a Large Language Model (Generative AI model) to
-                          power this Assistant
-                        </p>
+                        Select a Large Language Model (Generative AI model) to
+                        power this Assistant
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -627,7 +622,10 @@ export function AssistantEditor({
                   otherwise specified below.
                   {admin &&
                     user?.preferences.default_model &&
-                    `  Your current (user-specific) default model is ${getDisplayNameForModel(destructureValue(user?.preferences?.default_model!).modelName)}`}
+                    `  Your current (user-specific) default model is ${getDisplayNameForModel(
+                      destructureValue(user?.preferences?.default_model!)
+                        .modelName
+                    )}`}
                 </p>
                 {admin ? (
                   <div className="mb-2 flex items-starts">
@@ -702,16 +700,14 @@ export function AssistantEditor({
                   <div className="block font-medium text-base">
                     Capabilities{" "}
                   </div>
-                  <TooltipProvider delayDuration={50}>
+                  <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
                         <FiInfo size={12} />
                       </TooltipTrigger>
                       <TooltipContent side="top" align="center">
-                        <p className="bg-background-900 max-w-[200px] mb-1 text-sm rounded-lg p-1.5 text-white">
-                          You can give your assistant advanced capabilities like
-                          image generation
-                        </p>
+                        You can give your assistant advanced capabilities like
+                        image generation
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -722,7 +718,7 @@ export function AssistantEditor({
 
                 <div className="mt-4 flex flex-col gap-y-4  ml-1">
                   {imageGenerationTool && (
-                    <TooltipProvider delayDuration={50}>
+                    <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div
@@ -770,7 +766,7 @@ export function AssistantEditor({
                   )}
 
                   {searchTool && (
-                    <TooltipProvider delayDuration={50}>
+                    <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div
@@ -869,7 +865,7 @@ export function AssistantEditor({
                                     )}
                                   />
                                 ) : (
-                                  <Italic className="text-sm">
+                                  <p className="text-sm italic">
                                     No Document Sets available.{" "}
                                     {user?.role !== "admin" && (
                                       <>
@@ -878,7 +874,7 @@ export function AssistantEditor({
                                         Danswer for assistance.
                                       </>
                                     )}
-                                  </Italic>
+                                  </p>
                                 )}
 
                                 <div className="mt-4  flex flex-col gap-y-4">
@@ -972,7 +968,7 @@ export function AssistantEditor({
                   )}
                 </div>
               </div>
-              <Divider />
+              <Separator />
               <AdvancedOptionsToggle
                 showAdvancedOptions={showAdvancedOptions}
                 setShowAdvancedOptions={setShowAdvancedOptions}
@@ -1055,36 +1051,6 @@ export function AssistantEditor({
                                         </div>
 
                                         <div className="mt-3">
-                                          <Label small>Description</Label>
-                                          <SubLabel>
-                                            A description which tells the user
-                                            what they might want to use this
-                                            Starter Message for. For example
-                                            &quot;to a client about a new
-                                            feature&quot;
-                                          </SubLabel>
-                                          <Field
-                                            name={`starter_messages.${index}.description`}
-                                            className={`
-                                            border 
-                                            border-border 
-                                            bg-background 
-                                            rounded 
-                                            w-full 
-                                            py-2 
-                                            px-3 
-                                            mr-4
-                                          `}
-                                            autoComplete="off"
-                                          />
-                                          <ErrorMessage
-                                            name={`starter_messages[${index}].description`}
-                                            component="div"
-                                            className="text-error text-sm mt-1"
-                                          />
-                                        </div>
-
-                                        <div className="mt-3">
                                           <Label small>Message</Label>
                                           <SubLabel>
                                             The actual message to be sent as the
@@ -1104,7 +1070,9 @@ export function AssistantEditor({
                                               w-full 
                                               py-2 
                                               px-3 
+                                              min-h-12
                                               mr-4
+                                              line-clamp-
                                           `}
                                             as="textarea"
                                             autoComplete="off"
@@ -1138,11 +1106,9 @@ export function AssistantEditor({
                                 message: "",
                               });
                             }}
-                            className="text-white mt-3"
-                            size="xs"
-                            type="button"
-                            icon={FiPlus}
-                            color="green"
+                            className="mt-3"
+                            size="sm"
+                            variant="next"
                           >
                             Add New
                           </Button>
@@ -1166,9 +1132,7 @@ export function AssistantEditor({
 
               <div className="flex">
                 <Button
-                  className="mx-auto"
-                  color="green"
-                  size="md"
+                  variant="submit"
                   type="submit"
                   disabled={isSubmitting || isRequestSuccessful}
                 >

@@ -53,21 +53,23 @@ export interface SlackCredentialJson {
 }
 
 export interface GmailCredentialJson {
-  gmail_tokens: string;
+  google_tokens: string;
+  google_primary_admin: string;
 }
 
 export interface GoogleDriveCredentialJson {
-  google_drive_tokens: string;
+  google_tokens: string;
+  google_primary_admin: string;
 }
 
 export interface GmailServiceAccountCredentialJson {
-  gmail_service_account_key: string;
-  gmail_delegated_user: string;
+  google_service_account_key: string;
+  google_primary_admin: string;
 }
 
 export interface GoogleDriveServiceAccountCredentialJson {
-  google_drive_service_account_key: string;
-  google_drive_delegated_user: string;
+  google_service_account_key: string;
+  google_primary_admin: string;
 }
 
 export interface SlabCredentialJson {
@@ -186,6 +188,16 @@ export interface AxeroCredentialJson {
   axero_api_token: string;
 }
 
+export interface FreshdeskCredentialJson {
+  freshdesk_domain: string;
+  freshdesk_password: string;
+  freshdesk_api_key: string;
+}
+
+export interface FirefliesCredentialJson {
+  fireflies_api_key: string;
+}
+
 export interface MediaWikiCredentialJson {}
 export interface WikipediaCredentialJson extends MediaWikiCredentialJson {}
 
@@ -284,6 +296,14 @@ export const credentialTemplates: Record<ValidSources, any> = {
     access_key_id: "",
     secret_access_key: "",
   } as OCICredentialJson,
+  freshdesk: {
+    freshdesk_domain: "",
+    freshdesk_password: "",
+    freshdesk_api_key: "",
+  } as FreshdeskCredentialJson,
+  fireflies: {
+    fireflies_api_key: "",
+  } as FirefliesCredentialJson,
   xenforo: null,
   google_sites: null,
   file: null,
@@ -294,8 +314,8 @@ export const credentialTemplates: Record<ValidSources, any> = {
   ingestion_api: null,
 
   // NOTE: These are Special Cases
-  google_drive: { google_drive_tokens: "" } as GoogleDriveCredentialJson,
-  gmail: { gmail_tokens: "" } as GmailCredentialJson,
+  google_drive: { google_tokens: "" } as GoogleDriveCredentialJson,
+  gmail: { google_tokens: "" } as GmailCredentialJson,
 };
 
 export const credentialDisplayNames: Record<string, string> = {
@@ -325,19 +345,10 @@ export const credentialDisplayNames: Record<string, string> = {
   // Slack
   slack_bot_token: "Slack Bot Token",
 
-  // Gmail
-  gmail_tokens: "Gmail Tokens",
-
-  // Google Drive
-  google_drive_tokens: "Google Drive Tokens",
-
-  // Gmail Service Account
-  gmail_service_account_key: "Gmail Service Account Key",
-  gmail_delegated_user: "Gmail Delegated User",
-
-  // Google Drive Service Account
-  google_drive_service_account_key: "Google Drive Service Account Key",
-  google_drive_delegated_user: "Google Drive Delegated User",
+  // Gmail and Google Drive
+  google_tokens: "Google Oauth Tokens",
+  google_service_account_key: "Google Service Account Key",
+  google_primary_admin: "Primary Admin Email",
 
   // Slab
   slab_bot_token: "Slab Bot Token",
@@ -428,7 +439,16 @@ export const credentialDisplayNames: Record<string, string> = {
   // Axero
   base_url: "Axero Base URL",
   axero_api_token: "Axero API Token",
+
+  // Freshdesk
+  freshdesk_domain: "Freshdesk Domain",
+  freshdesk_password: "Freshdesk Password",
+  freshdesk_api_key: "Freshdesk API Key",
+
+  // Fireflies
+  fireflies_api_key: "Fireflies API Key",
 };
+
 export function getDisplayNameForCredentialKey(key: string): string {
   return credentialDisplayNames[key] || key;
 }

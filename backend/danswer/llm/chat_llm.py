@@ -26,6 +26,7 @@ from danswer.configs.app_configs import LOG_ALL_MODEL_INTERACTIONS
 from danswer.configs.app_configs import LOG_DANSWER_MODEL_INTERACTIONS
 from danswer.configs.model_configs import DISABLE_LITELLM_STREAMING
 from danswer.configs.model_configs import GEN_AI_TEMPERATURE
+from danswer.configs.model_configs import LITELLM_EXTRA_BODY
 from danswer.llm.interfaces import LLM
 from danswer.llm.interfaces import LLMConfig
 from danswer.llm.interfaces import ToolChoiceOptions
@@ -83,8 +84,10 @@ def _convert_litellm_message_to_langchain_message(
                     "args": json.loads(tool_call.function.arguments),
                     "id": tool_call.id,
                 }
-                for tool_call in (tool_calls if tool_calls else [])
-            ],
+                for tool_call in tool_calls
+            ]
+            if tool_calls
+            else [],
         )
     elif role == "system":
         return SystemMessage(content=content)
@@ -211,6 +214,7 @@ class DefaultMultiLLM(LLM):
         temperature: float = GEN_AI_TEMPERATURE,
         custom_config: dict[str, str] | None = None,
         extra_headers: dict[str, str] | None = None,
+        extra_body: dict | None = LITELLM_EXTRA_BODY,
     ):
         self._timeout = timeout
         self._model_provider = model_provider
@@ -244,6 +248,8 @@ class DefaultMultiLLM(LLM):
         model_kwargs: dict[str, Any] = {}
         if extra_headers:
             model_kwargs.update({"extra_headers": extra_headers})
+        if extra_body:
+            model_kwargs.update({"extra_body": extra_body})
 
         self._model_kwargs = model_kwargs
 

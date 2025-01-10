@@ -24,7 +24,9 @@ _REQUEST_PAGINATION_LIMIT = 5000
 def _get_server_space_permissions(
     confluence_client: OnyxConfluence, space_key: str
 ) -> ExternalAccess:
-    space_permissions = confluence_client.get_space_permissions(space_key=space_key)
+    space_permissions = confluence_client.get_all_space_permissions_server(
+        space_key=space_key
+    )
 
     viewspace_permissions = []
     for permission_category in space_permissions:

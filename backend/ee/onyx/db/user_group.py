@@ -374,7 +374,9 @@ def _add_user_group__cc_pair_relationships__no_commit(
 
 
 def insert_user_group(db_session: Session, user_group: UserGroupCreate) -> UserGroup:
-    db_user_group = UserGroup(name=user_group.name, time_updated=func.now())
+    db_user_group = UserGroup(
+        name=user_group.name, time_last_modified_by_user=func.now()
+    )
     db_session.add(db_user_group)
     db_session.flush()  # give the group an ID
 

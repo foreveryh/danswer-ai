@@ -42,24 +42,22 @@ def _fetch_permissions_for_permission_ids(
     if not permission_info or not doc_id:
         return []
 
-    # Check cache first for all permission IDs
     permissions = [
         _PERMISSION_ID_PERMISSION_MAP[pid]
         for pid in permission_ids
         if pid in _PERMISSION_ID_PERMISSION_MAP
     ]
 
-    # If we found all permissions in cache, return them
     if len(permissions) == len(permission_ids):
         return permissions
 
     owner_email = permission_info.get("owner_email")
+
     drive_service = get_drive_service(
         creds=google_drive_connector.creds,
         user_email=(owner_email or google_drive_connector.primary_admin_email),
     )
 
-    # Otherwise, fetch all permissions and update cache
     fetched_permissions = execute_paginated_retrieval(
         retrieval_function=drive_service.permissions().list,
         list_key="permissions",
@@ -69,7 +67,6 @@ def _fetch_permissions_for_permission_ids(
     )
 
     permissions_for_doc_id = []
-    # Update cache and return all permissions
     for permission in fetched_permissions:
         permissions_for_doc_id.append(permission)
         _PERMISSION_ID_PERMISSION_MAP[permission["id"]] = permission

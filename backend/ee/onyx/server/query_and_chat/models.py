@@ -125,10 +125,10 @@ class OneShotQARequest(ChunkContext):
     # will also disable Thread-based Rewording if specified
     query_override: str | None = None
 
-    # If True, skips generative an AI response to the search query
+    # If True, skips generating an AI response to the search query
     skip_gen_ai_answer_generation: bool = False
 
-    # If True, uses pro search instead of basic search
+    # If True, uses agentic search instead of basic search
     use_agentic_search: bool = False
 
     @model_validator(mode="after")

@@ -7,16 +7,17 @@ import { SourceIcon } from "@/components/SourceIcon";
 import { CCPairStatus } from "@/components/Status";
 import { usePopup } from "@/components/admin/connectors/Popup";
 import CredentialSection from "@/components/credentials/CredentialSection";
-import { CheckmarkIcon, EditIcon, XIcon } from "@/components/icons/icons";
-import { updateConnectorCredentialPairName } from "@/lib/connector";
+import {
+  updateConnectorCredentialPairName,
+  updateConnectorCredentialPairProperty,
+} from "@/lib/connector";
 import { credentialTemplates } from "@/lib/connectors/credentials";
 import { errorHandlingFetcher } from "@/lib/fetcher";
 import { ValidSources } from "@/lib/types";
-import { Button } from "@/components/ui/button";
 import Title from "@/components/ui/title";
 import { Separator } from "@/components/ui/separator";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import useSWR, { mutate } from "swr";
 import { AdvancedConfigDisplay, ConfigDisplay } from "./ConfigDisplay";
 import { DeletionButton } from "./DeletionButton";
@@ -26,11 +27,29 @@ import { ModifyStatusButtonCluster } from "./ModifyStatusButtonCluster";
 import { ReIndexButton } from "./ReIndexButton";
 import { buildCCPairInfoUrl } from "./lib";
 import { CCPairFullInfo, ConnectorCredentialPairStatus } from "./types";
+import { EditableStringFieldDisplay } from "@/components/EditableStringFieldDisplay";
+import { Button } from "@/components/ui/button";
+import EditPropertyModal from "@/components/modals/EditPropertyModal";
 
-// since the uploaded files are cleaned up after some period of time
-// re-indexing will not work for the file connector. Also, it would not
-// make sense to re-index, since the files will not have changed.
-const CONNECTOR_TYPES_THAT_CANT_REINDEX: ValidSources[] = ["file"];
+import * as Yup from "yup";
+
+// synchronize these validations with the SQLAlchemy connector class until we have a
+// centralized schema for both frontend and backend
+const RefreshFrequencySchema = Yup.object().shape({
+  propertyValue: Yup.number()
+    .typeError("Property value must be a valid number")
+    .integer("Property value must be an integer")
+    .min(60, "Property value must be greater than or equal to 60")
+    .required("Property value is required"),
+});
+
+const PruneFrequencySchema = Yup.object().shape({
+  propertyValue: Yup.number()
+    .typeError("Property value must be a valid number")
+    .integer("Property value must be an integer")
+    .min(86400, "Property value must be greater than or equal to 86400")
+    .required("Property value is required"),
+});
 
 function Main({ ccPairId }: { ccPairId: number }) {
   const router = useRouter(); // Initialize the router
@@ -45,21 +64,13 @@ function Main({ ccPairId }: { ccPairId: number }) {
   );
 
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  const [editableName, setEditableName] = useState(ccPair?.name || "");
-  const [isEditing, setIsEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
+  const [editingRefreshFrequency, setEditingRefreshFrequency] = useState(false);
+  const [editingPruningFrequency, setEditingPruningFrequency] = useState(false);
   const { popup, setPopup } = usePopup();
 
   const finishConnectorDeletion = useCallback(() => {
     router.push("/admin/indexing/status?message=connector-deleted");
   }, [router]);
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isEditing]);
 
   useEffect(() => {
     if (isLoading) {
@@ -78,21 +89,16 @@ function Main({ ccPairId }: { ccPairId: number }) {
     }
   }, [isLoading, ccPair, error, hasLoadedOnce, finishConnectorDeletion]);
 
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditableName(e.target.value);
-  };
-
-  const handleUpdateName = async () => {
+  const handleUpdateName = async (newName: string) => {
     try {
       const response = await updateConnectorCredentialPairName(
         ccPair?.id!,
-        editableName
+        newName
       );
       if (!response.ok) {
         throw new Error(await response.text());
       }
       mutate(buildCCPairInfoUrl(ccPairId));
-      setIsEditing(false);
       setPopup({
         message: "Connector name updated successfully",
         type: "success",
@@ -100,6 +106,86 @@ function Main({ ccPairId }: { ccPairId: number }) {
     } catch (error) {
       setPopup({
         message: `Failed to update connector name`,
+        type: "error",
+      });
+    }
+  };
+
+  const handleRefreshEdit = async () => {
+    setEditingRefreshFrequency(true);
+  };
+
+  const handlePruningEdit = async () => {
+    setEditingPruningFrequency(true);
+  };
+
+  const handleRefreshSubmit = async (
+    propertyName: string,
+    propertyValue: string
+  ) => {
+    const parsedRefreshFreq = parseInt(propertyValue, 10);
+
+    if (isNaN(parsedRefreshFreq)) {
+      setPopup({
+        message: "Invalid refresh frequency: must be an integer",
+        type: "error",
+      });
+      return;
+    }
+
+    try {
+      const response = await updateConnectorCredentialPairProperty(
+        ccPairId,
+        propertyName,
+        String(parsedRefreshFreq)
+      );
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      mutate(buildCCPairInfoUrl(ccPairId));
+      setPopup({
+        message: "Connector refresh frequency updated successfully",
+        type: "success",
+      });
+    } catch (error) {
+      setPopup({
+        message: "Failed to update connector refresh frequency",
+        type: "error",
+      });
+    }
+  };
+
+  const handlePruningSubmit = async (
+    propertyName: string,
+    propertyValue: string
+  ) => {
+    const parsedFreq = parseInt(propertyValue, 10);
+
+    if (isNaN(parsedFreq)) {
+      setPopup({
+        message: "Invalid pruning frequency: must be an integer",
+        type: "error",
+      });
+      return;
+    }
+
+    try {
+      const response = await updateConnectorCredentialPairProperty(
+        ccPairId,
+        propertyName,
+        String(parsedFreq)
+      );
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      mutate(buildCCPairInfoUrl(ccPairId));
+      setPopup({
+        message: "Connector pruning frequency updated successfully",
+        type: "success",
+      });
+    } catch (error) {
+      setPopup({
+        message: "Failed to update connector pruning frequency",
         type: "error",
       });
     }
@@ -124,81 +210,71 @@ function Main({ ccPairId }: { ccPairId: number }) {
     mutate(buildCCPairInfoUrl(ccPairId));
   };
 
-  const startEditing = () => {
-    setEditableName(ccPair.name);
-    setIsEditing(true);
-  };
-
-  const resetEditing = () => {
-    setIsEditing(false);
-    setEditableName(ccPair.name);
-  };
-
   const {
     prune_freq: pruneFreq,
     refresh_freq: refreshFreq,
     indexing_start: indexingStart,
   } = ccPair.connector;
+
   return (
     <>
       {popup}
+
+      {editingRefreshFrequency && (
+        <EditPropertyModal
+          propertyTitle="Refresh Frequency"
+          propertyDetails="How often the connector should refresh (in seconds)"
+          propertyName="refresh_frequency"
+          propertyValue={String(refreshFreq)}
+          validationSchema={RefreshFrequencySchema}
+          onSubmit={handleRefreshSubmit}
+          onClose={() => setEditingRefreshFrequency(false)}
+        />
+      )}
+
+      {editingPruningFrequency && (
+        <EditPropertyModal
+          propertyTitle="Pruning Frequency"
+          propertyDetails="How often the connector should be pruned (in seconds)"
+          propertyName="pruning_frequency"
+          propertyValue={String(pruneFreq)}
+          validationSchema={PruneFrequencySchema}
+          onSubmit={handlePruningSubmit}
+          onClose={() => setEditingPruningFrequency(false)}
+        />
+      )}
+
       <BackButton
         behaviorOverride={() => router.push("/admin/indexing/status")}
       />
-      <div className="pb-1 flex mt-1">
-        <div className="mr-2 my-auto">
-          <SourceIcon iconSize={24} sourceType={ccPair.connector.source} />
+      <div className="flex items-center justify-between h-14">
+        <div className="my-auto">
+          <SourceIcon iconSize={32} sourceType={ccPair.connector.source} />
         </div>
 
-        {ccPair.is_editable_for_current_user && isEditing ? (
-          <div className="flex items-center">
-            <input
-              ref={inputRef}
-              type="text"
-              value={editableName}
-              onChange={handleNameChange}
-              className="text-3xl w-full ring ring-1 ring-neutral-800 text-emphasis font-bold"
-            />
-            <Button onClick={handleUpdateName}>
-              <CheckmarkIcon className="text-neutral-200" />
-            </Button>
-            <Button onClick={() => resetEditing()}>
-              <XIcon className="text-neutral-200" />
-            </Button>
-          </div>
-        ) : (
-          <h1
-            onClick={() =>
-              ccPair.is_editable_for_current_user && startEditing()
-            }
-            className={`group flex ${
-              ccPair.is_editable_for_current_user ? "cursor-pointer" : ""
-            } text-3xl text-emphasis gap-x-2 items-center font-bold`}
-          >
-            {ccPair.name}
-            {ccPair.is_editable_for_current_user && (
-              <EditIcon className="group-hover:visible invisible" />
-            )}
-          </h1>
-        )}
+        <div className="ml-1 overflow-hidden text-ellipsis whitespace-nowrap flex-1 mr-4">
+          <EditableStringFieldDisplay
+            value={ccPair.name}
+            isEditable={ccPair.is_editable_for_current_user}
+            onUpdate={handleUpdateName}
+            scale={2.1}
+          />
+        </div>
 
         {ccPair.is_editable_for_current_user && (
           <div className="ml-auto flex gap-x-2">
-            {!CONNECTOR_TYPES_THAT_CANT_REINDEX.includes(
-              ccPair.connector.source
-            ) && (
-              <ReIndexButton
-                ccPairId={ccPair.id}
-                connectorId={ccPair.connector.id}
-                credentialId={ccPair.credential.id}
-                isDisabled={
-                  ccPair.indexing ||
-                  ccPair.status === ConnectorCredentialPairStatus.PAUSED
-                }
-                isIndexing={ccPair.indexing}
-                isDeleting={isDeleting}
-              />
-            )}
+            <ReIndexButton
+              ccPairId={ccPair.id}
+              connectorId={ccPair.connector.id}
+              credentialId={ccPair.credential.id}
+              isDisabled={
+                ccPair.indexing ||
+                ccPair.status === ConnectorCredentialPairStatus.PAUSED
+              }
+              isIndexing={ccPair.indexing}
+              isDeleting={isDeleting}
+            />
+
             {!isDeleting && <ModifyStatusButtonCluster ccPair={ccPair} />}
           </div>
         )}
@@ -209,14 +285,20 @@ function Main({ ccPairId }: { ccPairId: number }) {
         isDeleting={isDeleting}
       />
       <div className="text-sm mt-1">
+        Creator:{" "}
+        <b className="text-emphasis">{ccPair.creator_email ?? "Unknown"}</b>
+      </div>
+      <div className="text-sm mt-1">
         Total Documents Indexed:{" "}
         <b className="text-emphasis">{ccPair.num_docs_indexed}</b>
       </div>
       {!ccPair.is_editable_for_current_user && (
-        <div className="text-sm mt-2 text-neutral-500 italic">
-          {ccPair.is_public
+        <div className="text-sm mt-2 text-text-500 italic">
+          {ccPair.access_type === "public"
             ? "Public connectors are not editable by curators."
-            : "This connector belongs to groups where you don't have curator permissions, so it's not editable."}
+            : ccPair.access_type === "sync"
+              ? "Sync connectors are not editable by curators unless the curator is also the owner."
+              : "This connector belongs to groups where you don't have curator permissions, so it's not editable."}
         </div>
       )}
 
@@ -255,6 +337,8 @@ function Main({ ccPairId }: { ccPairId: number }) {
           pruneFreq={pruneFreq}
           indexingStart={indexingStart}
           refreshFreq={refreshFreq}
+          onRefreshEdit={handleRefreshEdit}
+          onPruningEdit={handlePruningEdit}
         />
       )}
 
@@ -270,7 +354,7 @@ function Main({ ccPairId }: { ccPairId: number }) {
       <div className="flex mt-4">
         <div className="mx-auto">
           {ccPair.is_editable_for_current_user && (
-            <DeletionButton ccPair={ccPair} />
+            <DeletionButton ccPair={ccPair} refresh={refresh} />
           )}
         </div>
       </div>

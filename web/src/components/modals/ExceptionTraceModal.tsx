@@ -18,7 +18,7 @@ export default function ExceptionTraceModal({
       title="Full Exception Trace"
       onOutsideClick={onOutsideClick}
     >
-      <div className="overflow-y-auto include-scrollbar pr-3 h-full mb-6">
+      <div className="overflow-y-auto default-scrollbar overflow-x-hidden pr-3 h-full mb-6">
         <div className="mb-6">
           {!copyClicked ? (
             <div
@@ -27,13 +27,13 @@ export default function ExceptionTraceModal({
                 setCopyClicked(true);
                 setTimeout(() => setCopyClicked(false), 2000);
               }}
-              className="flex w-fit cursor-pointer hover:bg-hover-light p-2 border-border border rounded"
+              className="flex w-fit cursor-pointer hover:bg-accent-background p-2 border-border border rounded"
             >
               Copy full trace
               <CopyIcon className="ml-2 my-auto" />
             </div>
           ) : (
-            <div className="flex w-fit hover:bg-hover-light p-2 border-border border rounded cursor-default">
+            <div className="flex w-fit hover:bg-accent-background p-2 border-border border rounded cursor-default">
               Copied to clipboard
               <CheckmarkIcon
                 className="my-auto ml-2 flex flex-shrink-0 text-success"

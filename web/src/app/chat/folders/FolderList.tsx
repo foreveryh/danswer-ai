@@ -23,17 +23,26 @@ import { useRouter } from "next/navigation";
 import { CHAT_SESSION_ID_KEY } from "@/lib/drag/constants";
 import Cookies from "js-cookie";
 import { Popover } from "@/components/popover/Popover";
+import { ChatSession } from "../interfaces";
+import { useChatContext } from "@/components/context/ChatContext";
+
 const FolderItem = ({
   folder,
   currentChatId,
   isInitiallyExpanded,
   initiallySelected,
+  showShareModal,
+  showDeleteModal,
 }: {
   folder: Folder;
   currentChatId?: string;
   isInitiallyExpanded: boolean;
   initiallySelected: boolean;
+
+  showShareModal: ((chatSession: ChatSession) => void) | undefined;
+  showDeleteModal: ((chatSession: ChatSession) => void) | undefined;
 }) => {
+  const { refreshChatSessions } = useChatContext();
   const [isExpanded, setIsExpanded] = useState<boolean>(isInitiallyExpanded);
   const [isEditing, setIsEditing] = useState<boolean>(initiallySelected);
   const [editedFolderName, setEditedFolderName] = useState<string>(
@@ -54,11 +63,11 @@ const FolderItem = ({
         ? JSON.parse(openedFoldersCookieVal)
         : {};
       if (newIsExpanded) {
-        openedFolders[folder.folder_id] = true;
+        openedFolders[folder.folder_id!] = true;
       } else {
         setShowDeleteConfirm(false);
 
-        delete openedFolders[folder.folder_id];
+        delete openedFolders[folder.folder_id!];
       }
       Cookies.set("openedFolders", JSON.stringify(openedFolders));
     }
@@ -83,7 +92,7 @@ const FolderItem = ({
 
   const saveFolderName = async (continueEditing?: boolean) => {
     try {
-      await updateFolderName(folder.folder_id, editedFolderName);
+      await updateFolderName(folder.folder_id!, editedFolderName);
       if (!continueEditing) {
         setIsEditing(false);
       }
@@ -104,7 +113,7 @@ const FolderItem = ({
   const confirmDelete = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     try {
-      await deleteFolder(folder.folder_id);
+      await deleteFolder(folder.folder_id!);
       router.refresh();
     } catch (error) {
       setPopup({ message: "Failed to delete folder", type: "error" });
@@ -147,8 +156,9 @@ const FolderItem = ({
     setIsDragOver(false);
     const chatSessionId = event.dataTransfer.getData(CHAT_SESSION_ID_KEY);
     try {
-      await addChatToFolder(folder.folder_id, chatSessionId);
-      router.refresh(); // Refresh to show the updated folder contents
+      await addChatToFolder(folder.folder_id!, chatSessionId);
+      await refreshChatSessions();
+      router.refresh();
     } catch (error) {
       setPopup({
         message: "Failed to add chat session to folder",
@@ -161,6 +171,9 @@ const FolderItem = ({
     return a.time_created.localeCompare(b.time_created);
   });
 
+  // Determine whether to show the trash can icon
+  const showTrashIcon = (isHovering && !isEditing) || showDeleteConfirm;
+
   return (
     <div
       key={folder.folder_id}
@@ -171,7 +184,7 @@ const FolderItem = ({
       onDragLeave={() => setIsDragOver(false)}
       onDrop={handleDrop}
       className={`transition duration-300 ease-in-out rounded-md ${
-        isDragOver ? "bg-hover" : ""
+        isDragOver ? "bg-accent-background-hovered" : ""
       }`}
     >
       <BasicSelectable fullWidth selected={false}>
@@ -206,55 +219,60 @@ const FolderItem = ({
                   {editedFolderName || folder.folder_name}
                 </div>
               )}
-              {isHovering && !isEditing && (
-                <div className="flex ml-auto my-auto">
-                  <div
-                    onClick={handleEditFolderName}
-                    className="hover:bg-black/10 p-1 -m-1 rounded"
-                  >
-                    <FiEdit2 size={16} />
-                  </div>
-                  <div className="relative">
-                    <Popover
-                      open={showDeleteConfirm}
-                      onOpenChange={setShowDeleteConfirm}
-                      content={
-                        <div
-                          onClick={handleDeleteClick}
-                          className="hover:bg-black/10 p-1 -m-1 rounded ml-2"
-                        >
-                          <FiTrash size={16} />
-                        </div>
-                      }
-                      popover={
-                        <div className="p-2 w-[225px] bg-background-100 rounded shadow-lg">
-                          <p className="text-sm mb-2">
-                            Are you sure you want to delete{" "}
-                            <i>{folder.folder_name}</i>? All the content inside
-                            this folder will also be deleted.
-                          </p>
-                          <div className="flex justify-end">
-                            <button
-                              onClick={confirmDelete}
-                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs mr-2"
-                            >
-                              Yes
-                            </button>
-                            <button
-                              onClick={cancelDelete}
-                              className="bg-gray-300 hover:bg-gray-200 px-2 py-1 rounded text-xs"
-                            >
-                              No
-                            </button>
-                          </div>
-                        </div>
-                      }
-                      side="top"
-                      align="center"
-                    />
-                  </div>
+
+              <div className="flex ml-auto my-auto">
+                <div
+                  onClick={handleEditFolderName}
+                  className={`hover:bg-black/10 p-1 -m-1 rounded ${
+                    isHovering && !isEditing
+                      ? ""
+                      : "opacity-0 pointer-events-none"
+                  }`}
+                >
+                  <FiEdit2 size={16} />
                 </div>
-              )}
+
+                <div className="relative">
+                  <Popover
+                    open={showDeleteConfirm}
+                    onOpenChange={setShowDeleteConfirm}
+                    content={
+                      <div
+                        onClick={handleDeleteClick}
+                        className={`hover:bg-black/10 p-1 -m-1 rounded ml-2 ${
+                          showTrashIcon ? "" : "opacity-0 pointer-events-none"
+                        }`}
+                      >
+                        <FiTrash size={16} />
+                      </div>
+                    }
+                    popover={
+                      <div className="p-2 w-[225px] bg-background-100 rounded shadow-lg">
+                        <p className="text-sm mb-2">
+                          Are you sure you want to delete folder{" "}
+                          <i>{folder.folder_name}</i>?
+                        </p>
+                        <div className="flex justify-end">
+                          <button
+                            onClick={confirmDelete}
+                            className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs mr-2"
+                          >
+                            Yes
+                          </button>
+                          <button
+                            onClick={cancelDelete}
+                            className="bg-background-300 hover:bg-background-200 px-2 py-1 rounded text-xs"
+                          >
+                            No
+                          </button>
+                        </div>
+                      </div>
+                    }
+                    side="top"
+                    align="center"
+                  />
+                </div>
+              </div>
 
               {isEditing && (
                 <div className="flex ml-auto my-auto">
@@ -276,14 +294,18 @@ const FolderItem = ({
           </div>
         </div>
       </BasicSelectable>
+
+      {/* Expanded Folder Content */}
       {isExpanded && folders && (
-        <div className={"ml-2 pl-2 border-l border-border"}>
+        <div className={"mr-4 pl-2 w-full  border-l border-border"}>
           {folders.map((chatSession) => (
             <ChatSessionDisplay
               key={chatSession.id}
               chatSession={chatSession}
               isSelected={chatSession.id === currentChatId}
               skipGradient={isDragOver}
+              showShareModal={showShareModal}
+              showDeleteModal={showDeleteModal}
             />
           ))}
         </div>
@@ -297,11 +319,15 @@ export const FolderList = ({
   currentChatId,
   openedFolders,
   newFolderId,
+  showShareModal,
+  showDeleteModal,
 }: {
   folders: Folder[];
   currentChatId?: string;
   openedFolders?: { [key: number]: boolean };
   newFolderId: number | null;
+  showShareModal: ((chatSession: ChatSession) => void) | undefined;
+  showDeleteModal: ((chatSession: ChatSession) => void) | undefined;
 }) => {
   if (folders.length === 0) {
     return null;
@@ -316,8 +342,10 @@ export const FolderList = ({
           currentChatId={currentChatId}
           initiallySelected={newFolderId == folder.folder_id}
           isInitiallyExpanded={
-            openedFolders ? openedFolders[folder.folder_id] || false : false
+            openedFolders ? openedFolders[folder.folder_id!] || false : false
           }
+          showShareModal={showShareModal}
+          showDeleteModal={showDeleteModal}
         />
       ))}
       {folders.length == 1 && folders[0].chat_sessions.length == 0 && (

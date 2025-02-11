@@ -3,9 +3,10 @@ from uuid import uuid4
 
 import requests
 
-from danswer.connectors.models import InputType
-from danswer.server.documents.models import ConnectorUpdateRequest
-from danswer.server.documents.models import DocumentSource
+from onyx.connectors.models import InputType
+from onyx.db.enums import AccessType
+from onyx.server.documents.models import ConnectorUpdateRequest
+from onyx.server.documents.models import DocumentSource
 from tests.integration.common_utils.constants import API_SERVER_URL
 from tests.integration.common_utils.constants import GENERAL_HEADERS
 from tests.integration.common_utils.test_models import DATestConnector
@@ -19,7 +20,7 @@ class ConnectorManager:
         source: DocumentSource = DocumentSource.FILE,
         input_type: InputType = InputType.LOAD_STATE,
         connector_specific_config: dict[str, Any] | None = None,
-        is_public: bool = True,
+        access_type: AccessType = AccessType.PUBLIC,
         groups: list[int] | None = None,
         user_performing_action: DATestUser | None = None,
     ) -> DATestConnector:
@@ -30,7 +31,7 @@ class ConnectorManager:
             source=source,
             input_type=input_type,
             connector_specific_config=connector_specific_config or {},
-            is_public=is_public,
+            access_type=access_type,
             groups=groups or [],
         )
 
@@ -51,7 +52,7 @@ class ConnectorManager:
             input_type=input_type,
             connector_specific_config=connector_specific_config or {},
             groups=groups,
-            is_public=is_public,
+            access_type=access_type,
         )
 
     @staticmethod

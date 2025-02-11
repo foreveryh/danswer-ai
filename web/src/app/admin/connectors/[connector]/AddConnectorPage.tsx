@@ -2,16 +2,15 @@
 
 import { errorHandlingFetcher } from "@/lib/fetcher";
 import useSWR, { mutate } from "swr";
-import { HealthCheckBanner } from "@/components/health/healthcheck";
 
 import Title from "@/components/ui/title";
 import { AdminPageTitle } from "@/components/admin/Title";
 import { buildSimilarCredentialInfoURL } from "@/app/admin/connector/[ccPairId]/lib";
 import { usePopup } from "@/components/admin/connectors/Popup";
 import { useFormContext } from "@/components/context/FormContext";
-import { getSourceDisplayName } from "@/lib/sources";
+import { getSourceDisplayName, getSourceMetadata } from "@/lib/sources";
 import { SourceIcon } from "@/components/SourceIcon";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { deleteCredential, linkCredential } from "@/lib/credential";
 import { submitFiles } from "./pages/utils/files";
 import { submitGoogleSite } from "./pages/utils/google_site";
@@ -19,8 +18,16 @@ import AdvancedFormPage from "./pages/Advanced";
 import DynamicConnectionForm from "./pages/DynamicConnectorCreationForm";
 import CreateCredential from "@/components/credentials/actions/CreateCredential";
 import ModifyCredential from "@/components/credentials/actions/ModifyCredential";
-import { ConfigurableSources, ValidSources } from "@/lib/types";
-import { Credential, credentialTemplates } from "@/lib/connectors/credentials";
+import {
+  ConfigurableSources,
+  oauthSupportedSources,
+  ValidSources,
+} from "@/lib/types";
+import {
+  Credential,
+  credentialTemplates,
+  OAuthDetails,
+} from "@/lib/connectors/credentials";
 import {
   ConnectionConfiguration,
   connectorConfigs,
@@ -33,7 +40,6 @@ import {
   ConnectorBase,
 } from "@/lib/connectors/connectors";
 import { Modal } from "@/components/Modal";
-import GDriveMain from "./pages/gdrive/GoogleDrivePage";
 import { GmailMain } from "./pages/gmail/GmailPage";
 import {
   useGmailCredentials,
@@ -43,6 +49,20 @@ import { Formik } from "formik";
 import NavigationRow from "./NavigationRow";
 import { useRouter } from "next/navigation";
 import CardSection from "@/components/admin/CardSection";
+import { prepareOAuthAuthorizationRequest } from "@/lib/oauth_utils";
+import {
+  EE_ENABLED,
+  NEXT_PUBLIC_CLOUD_ENABLED,
+  NEXT_PUBLIC_TEST_ENV,
+} from "@/lib/constants";
+import TemporaryLoadingModal from "@/components/TemporaryLoadingModal";
+import {
+  getConnectorOauthRedirectUrl,
+  useOAuthDetails,
+} from "@/lib/connectors/oauth";
+import { CreateStdOAuthCredential } from "@/components/credentials/actions/CreateStdOAuthCredential";
+import { Spinner } from "@/components/Spinner";
+import { Button } from "@/components/ui/button";
 export interface AdvancedConfig {
   refreshFreq: number;
   pruneFreq: number;
@@ -54,8 +74,7 @@ const BASE_CONNECTOR_URL = "/api/manage/admin/connector";
 export async function submitConnector<T>(
   connector: ConnectorBase<T>,
   connectorId?: number,
-  fakeCredential?: boolean,
-  isPublicCcpair?: boolean // exclusively for mock credentials, when also need to specify ccpair details
+  fakeCredential?: boolean
 ): Promise<{ message: string; isSuccess: boolean; response?: Connector<T> }> {
   const isUpdate = connectorId !== undefined;
   if (!connector.connector_specific_config) {
@@ -71,7 +90,7 @@ export async function submitConnector<T>(
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ ...connector, is_public: isPublicCcpair }),
+          body: JSON.stringify({ ...connector }),
         }
       );
       if (response.ok) {
@@ -111,13 +130,30 @@ export default function AddConnector({
 }: {
   connector: ConfigurableSources;
 }) {
+  const [currentPageUrl, setCurrentPageUrl] = useState<string | null>(null);
+  const [oauthUrl, setOauthUrl] = useState<string | null>(null);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [isAuthorizeVisible, setIsAuthorizeVisible] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCurrentPageUrl(window.location.href);
+    }
+
+    if (EE_ENABLED && (NEXT_PUBLIC_CLOUD_ENABLED || NEXT_PUBLIC_TEST_ENV)) {
+      const sourceMetadata = getSourceMetadata(connector);
+      if (sourceMetadata?.oauthSupported == true) {
+        setIsAuthorizeVisible(true);
+      }
+    }
+  }, []);
+
   const router = useRouter();
 
   // State for managing credentials and files
   const [currentCredential, setCurrentCredential] =
     useState<Credential<any> | null>(null);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [createConnectorToggle, setCreateConnectorToggle] = useState(false);
+  const [createCredentialFormToggle, setCreateCredentialFormToggle] =
+    useState(false);
 
   // Fetch credentials data
   const { data: credentials } = useSWR<Credential<any>[]>(
@@ -132,14 +168,17 @@ export default function AddConnector({
     { refreshInterval: 5000 }
   );
 
+  const { data: oauthDetails, isLoading: oauthDetailsLoading } =
+    useOAuthDetails(connector);
+
   // Get credential template and configuration
   const credentialTemplate = credentialTemplates[connector];
   const configuration: ConnectionConfiguration = connectorConfigs[connector];
 
   // Form context and popup management
-  const { setFormStep, setAlowCreate, formStep, nextFormStep, prevFormStep } =
-    useFormContext();
+  const { setFormStep, setAllowCreate, formStep } = useFormContext();
   const { popup, setPopup } = usePopup();
+  const [uploading, setUploading] = useState(false);
 
   // Hooks for Google Drive and Gmail credentials
   const { liveGDriveCredential } = useGoogleDriveCredentials(connector);
@@ -194,7 +233,7 @@ export default function AddConnector({
 
   const onSwap = async (selectedCredential: Credential<any>) => {
     setCurrentCredential(selectedCredential);
-    setAlowCreate(true);
+    setAllowCreate(true);
     setPopup({
       message: "Swapped credential successfully!",
       type: "success",
@@ -204,6 +243,37 @@ export default function AddConnector({
 
   const onSuccess = () => {
     router.push("/admin/indexing/status?message=connector-created");
+  };
+
+  const handleAuthorize = async () => {
+    // authorize button handler
+    // gets an auth url from the server and directs the user to it in a popup
+
+    if (!currentPageUrl) return;
+
+    setIsAuthorizing(true);
+    try {
+      const response = await prepareOAuthAuthorizationRequest(
+        connector,
+        currentPageUrl
+      );
+      if (response.url) {
+        setOauthUrl(response.url);
+        window.open(response.url, "_blank", "noopener,noreferrer");
+      } else {
+        setPopup({ message: "Failed to fetch OAuth URL", type: "error" });
+      }
+    } catch (error: unknown) {
+      // Narrow the type of error
+      if (error instanceof Error) {
+        setPopup({ message: `Error: ${error.message}`, type: "error" });
+      } else {
+        // Handle non-standard errors
+        setPopup({ message: "An unknown error occurred", type: "error" });
+      }
+    } finally {
+      setIsAuthorizing(false);
+    }
   };
 
   return (
@@ -259,6 +329,13 @@ export default function AddConnector({
           refreshFreq: (refreshFreq ?? defaultRefreshFreqMinutes) * 60,
         };
 
+        // File-specific handling
+        const selectedFiles = Array.isArray(values.file_locations)
+          ? values.file_locations
+          : values.file_locations
+            ? [values.file_locations]
+            : [];
+
         // Google sites-specific handling
         if (connector == "google_sites") {
           const response = await submitGoogleSite(
@@ -268,7 +345,7 @@ export default function AddConnector({
             advancedConfiguration.refreshFreq,
             advancedConfiguration.pruneFreq,
             advancedConfiguration.indexingStart,
-            values.access_type == "public",
+            values.access_type,
             groups,
             name
           );
@@ -277,20 +354,26 @@ export default function AddConnector({
           }
           return;
         }
-
         // File-specific handling
-        if (connector == "file" && selectedFiles.length > 0) {
-          const response = await submitFiles(
-            selectedFiles,
-            setPopup,
-            setSelectedFiles,
-            name,
-            access_type == "public",
-            groups
-          );
-          if (response) {
-            onSuccess();
+        if (connector == "file") {
+          setUploading(true);
+          try {
+            const response = await submitFiles(
+              selectedFiles,
+              setPopup,
+              name,
+              access_type,
+              groups
+            );
+            if (response) {
+              onSuccess();
+            }
+          } catch (error) {
+            setPopup({ message: "Error uploading files", type: "error" });
+          } finally {
+            setUploading(false);
           }
+
           return;
         }
 
@@ -300,15 +383,14 @@ export default function AddConnector({
             input_type: isLoadState(connector) ? "load_state" : "poll", // single case
             name: name,
             source: connector,
-            is_public: access_type == "public",
+            access_type: access_type,
             refresh_freq: advancedConfiguration.refreshFreq || null,
             prune_freq: advancedConfiguration.pruneFreq || null,
             indexing_start: advancedConfiguration.indexingStart || null,
             groups: groups,
           },
           undefined,
-          credentialActivated ? false : true,
-          access_type == "public"
+          credentialActivated ? false : true
         );
         // If no credential
         if (!credentialActivated) {
@@ -353,9 +435,9 @@ export default function AddConnector({
           <div className="mx-auto mb-8 w-full">
             {popup}
 
-            <div className="mb-4">
-              <HealthCheckBanner />
-            </div>
+            {uploading && (
+              <TemporaryLoadingModal content="Uploading files..." />
+            )}
 
             <AdminPageTitle
               includeDivider={false}
@@ -367,9 +449,7 @@ export default function AddConnector({
               <CardSection>
                 <Title className="mb-2 text-lg">Select a credential</Title>
 
-                {connector == "google_drive" ? (
-                  <GDriveMain />
-                ) : connector == "gmail" ? (
+                {connector == ValidSources.Gmail ? (
                   <GmailMain />
                 ) : (
                   <>
@@ -382,43 +462,100 @@ export default function AddConnector({
                       onDeleteCredential={onDeleteCredential}
                       onSwitch={onSwap}
                     />
-                    {!createConnectorToggle && (
-                      <button
-                        className="mt-6 text-sm bg-background-900 px-2 py-1.5 flex text-text-200 flex-none rounded"
-                        onClick={() =>
-                          setCreateConnectorToggle(
-                            (createConnectorToggle) => !createConnectorToggle
-                          )
-                        }
-                      >
-                        Create New
-                      </button>
+                    {!createCredentialFormToggle && (
+                      <div className="mt-6 flex space-x-4">
+                        {/* Button to pop up a form to manually enter credentials */}
+                        <Button
+                          variant="secondary"
+                          className="mt-6 text-sm mr-4"
+                          onClick={async () => {
+                            if (oauthDetails && oauthDetails.oauth_enabled) {
+                              if (oauthDetails.additional_kwargs.length > 0) {
+                                setCreateCredentialFormToggle(true);
+                              } else {
+                                const redirectUrl =
+                                  await getConnectorOauthRedirectUrl(
+                                    connector,
+                                    {}
+                                  );
+                                // if redirect is supported, just use it
+                                if (redirectUrl) {
+                                  window.location.href = redirectUrl;
+                                } else {
+                                  setCreateCredentialFormToggle(
+                                    (createConnectorToggle) =>
+                                      !createConnectorToggle
+                                  );
+                                }
+                              }
+                            } else {
+                              setCreateCredentialFormToggle(
+                                (createConnectorToggle) =>
+                                  !createConnectorToggle
+                              );
+                            }
+                          }}
+                        >
+                          Create New
+                        </Button>
+                        {/* Button to sign in via OAuth */}
+                        {oauthSupportedSources.includes(connector) &&
+                          (NEXT_PUBLIC_CLOUD_ENABLED ||
+                            NEXT_PUBLIC_TEST_ENV) && (
+                            <button
+                              onClick={handleAuthorize}
+                              className="mt-6 text-sm bg-blue-500 px-2 py-1.5 flex text-text-200 flex-none rounded"
+                              disabled={isAuthorizing}
+                              hidden={!isAuthorizeVisible}
+                            >
+                              {isAuthorizing
+                                ? "Authorizing..."
+                                : `Authorize with ${getSourceDisplayName(
+                                    connector
+                                  )}`}
+                            </button>
+                          )}
+                      </div>
                     )}
 
-                    {/* NOTE: connector will never be google_drive, since the ternary above will 
-                    prevent that, but still keeping this here for safety in case the above changes. */}
-                    {(connector as ValidSources) !== "google_drive" &&
-                      createConnectorToggle && (
-                        <Modal
-                          className="max-w-3xl rounded-lg"
-                          onOutsideClick={() => setCreateConnectorToggle(false)}
-                        >
+                    {createCredentialFormToggle && (
+                      <Modal
+                        className="max-w-3xl rounded-lg"
+                        onOutsideClick={() =>
+                          setCreateCredentialFormToggle(false)
+                        }
+                      >
+                        {oauthDetailsLoading ? (
+                          <Spinner />
+                        ) : (
                           <>
                             <Title className="mb-2 text-lg">
                               Create a {getSourceDisplayName(connector)}{" "}
                               credential
                             </Title>
-                            <CreateCredential
-                              close
-                              refresh={refresh}
-                              sourceType={connector}
-                              setPopup={setPopup}
-                              onSwitch={onSwap}
-                              onClose={() => setCreateConnectorToggle(false)}
-                            />
+                            {oauthDetails && oauthDetails.oauth_enabled ? (
+                              <CreateStdOAuthCredential
+                                sourceType={connector}
+                                additionalFields={
+                                  oauthDetails.additional_kwargs
+                                }
+                              />
+                            ) : (
+                              <CreateCredential
+                                close
+                                refresh={refresh}
+                                sourceType={connector}
+                                setPopup={setPopup}
+                                onSwitch={onSwap}
+                                onClose={() =>
+                                  setCreateCredentialFormToggle(false)
+                                }
+                              />
+                            )}
                           </>
-                        </Modal>
-                      )}
+                        )}
+                      </Modal>
+                    )}
                   </>
                 )}
               </CardSection>
@@ -429,8 +566,6 @@ export default function AddConnector({
                 <DynamicConnectionForm
                   values={formikProps.values}
                   config={configuration}
-                  setSelectedFiles={setSelectedFiles}
-                  selectedFiles={selectedFiles}
                   connector={connector}
                   currentCredential={
                     currentCredential ||

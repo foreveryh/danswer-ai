@@ -1,3 +1,4 @@
+"use client";
 import {
   ArrayHelpers,
   ErrorMessage,
@@ -25,10 +26,12 @@ import {
 } from "@/components/ui/tooltip";
 import ReactMarkdown from "react-markdown";
 import { FaMarkdown } from "react-icons/fa";
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import remarkGfm from "remark-gfm";
-import { EditIcon } from "@/components/icons/icons";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { CheckboxField } from "@/components/ui/checkbox";
+import { CheckedState } from "@radix-ui/react-checkbox";
 
 export function SectionHeader({
   children,
@@ -49,8 +52,8 @@ export function Label({
 }) {
   return (
     <div
-      className={`block font-medium base ${className} ${
-        small ? "text-sm" : "text-base"
+      className={`block text-text-darker font-medium base ${className} ${
+        small ? "text-xs" : "text-sm"
       }`}
     >
       {children}
@@ -74,7 +77,11 @@ export function LabelWithTooltip({
 }
 
 export function SubLabel({ children }: { children: string | JSX.Element }) {
-  return <div className="text-sm text-subtle mb-2">{children}</div>;
+  return (
+    <div className="text-sm text-neutral-600 dark:text-neutral-300 mb-2">
+      {children}
+    </div>
+  );
 }
 
 export function ManualErrorMessage({ children }: { children: string }) {
@@ -90,7 +97,7 @@ export function ExplanationText({
 }) {
   return link ? (
     <a
-      className="underline text-text-500 cursor-pointer text-sm font-medium"
+      className="underline text-text-500 cursor-pointer text-xs font-medium"
       target="_blank"
       href={link}
     >
@@ -109,7 +116,7 @@ export function ToolTipDetails({
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger>
+        <TooltipTrigger type="button">
           <FiInfo size={12} />
         </TooltipTrigger>
         <TooltipContent side="top" align="center">
@@ -141,12 +148,16 @@ export function TextFormField({
   explanationText,
   explanationLink,
   small,
+  maxWidth,
   removeLabel,
   min,
+  includeForgotPassword,
   onChange,
   width,
+  vertical,
+  className,
 }: {
-  value?: string;
+  value?: string; // Escape hatch for setting the value of the field - conflicts with Formik
   name: string;
   removeLabel?: boolean;
   label: string;
@@ -161,22 +172,26 @@ export function TextFormField({
   error?: string;
   defaultHeight?: string;
   isCode?: boolean;
-  fontSize?: "text-sm" | "text-base" | "text-lg";
+  fontSize?: "sm" | "md" | "lg";
+  maxWidth?: string;
   hideError?: boolean;
   tooltip?: string;
   explanationText?: string;
   explanationLink?: string;
   small?: boolean;
   min?: number;
+  includeForgotPassword?: boolean;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   width?: string;
+  vertical?: boolean;
+  className?: string;
 }) {
   let heightString = defaultHeight || "";
   if (isTextArea && !heightString) {
     heightString = "h-28";
   }
 
-  const [field, , helpers] = useField(name);
+  const [, , helpers] = useField(name);
   const { setValue } = helpers;
 
   const handleChange = (
@@ -187,17 +202,38 @@ export function TextFormField({
       onChange(e as React.ChangeEvent<HTMLInputElement>);
     }
   };
+  const textSizeClasses = {
+    sm: {
+      label: "text-sm",
+      input: "text-sm",
+      placeholder: "text-sm",
+    },
+    md: {
+      label: "text-base",
+      input: "text-base",
+      placeholder: "text-base",
+    },
+    lg: {
+      label: "text-lg",
+      input: "text-lg",
+      placeholder: "text-lg",
+    },
+  };
+
+  const sizeClass = textSizeClasses[fontSize || "sm"];
 
   return (
-    <div className={`w-full ${width}`}>
-      <div className="flex gap-x-2 items-center">
-        {!removeLabel && (
-          <Label className="text-text-950" small={small}>
-            {label}
-          </Label>
-        )}
-        {optional ? <span>(optional) </span> : ""}
-        {tooltip && <ToolTipDetails>{tooltip}</ToolTipDetails>}
+    <div className={`w-full ${maxWidth} ${width}`}>
+      <div
+        className={`flex ${
+          vertical ? "flex-col" : "flex-row"
+        } gap-x-2 items-start`}
+      >
+        <div className="flex gap-x-2 items-center">
+          {!removeLabel && <Label small={false}>{label}</Label>}
+          {optional ? <span>(optional) </span> : ""}
+          {tooltip && <ToolTipDetails>{tooltip}</ToolTipDetails>}
+        </div>
         {error ? (
           <ManualErrorMessage>{error}</ManualErrorMessage>
         ) : (
@@ -211,36 +247,70 @@ export function TextFormField({
         )}
       </div>
       {subtext && <SubLabel>{subtext}</SubLabel>}
-      <div className={`w-full flex ${includeRevert && "gap-x-2"}`}>
+      <div className={`w-full flex ${includeRevert && "gap-x-2"} relative`}>
         <Field
           onChange={handleChange}
           min={min}
           as={isTextArea ? "textarea" : "input"}
           type={type}
           defaultValue={value}
+          data-testid={name}
           name={name}
           id={name}
           className={`
-            ${small && "text-sm"}
-            border 
-            border-border 
-            rounded-md
+            ${small && sizeClass.input}
+            flex
+            h-10
             w-full 
-            py-2 
+            rounded-md
+            border 
+            border-neutral-200
+            bg-white
             px-3 
+            py-2 
             mt-1
+            text-base
+
+            file:border-0
+            file:bg-transparent
+            file:text-sm
+            file:font-medium
+            file:text-neutral-950
+            placeholder:text-neutral-500
             placeholder:font-description 
-            placeholder:text-base 
-            placeholder:text-text-400
+            placeholder:${sizeClass.placeholder}
+            caret-accent
+            focus-visible:outline-none
+            focus-visible:ring-1
+            focus-visible:ring-lighter-agent
+            focus-visible:ring-offset-1
+            disabled:cursor-not-allowed
+            disabled:opacity-50
+            md:text-sm
+            dark:border-neutral-700
+            dark:bg-transparent
+            dark:ring-offset-neutral-950
+            dark:file:text-neutral-50
+            dark:placeholder:text-neutral-400
+
             ${heightString}
-            ${fontSize}
-            ${disabled ? " bg-background-strong" : " bg-white"}
-            ${isCode ? " font-mono" : ""}
+            ${sizeClass.input}
+            ${disabled ? "bg-neutral-100 dark:bg-neutral-800" : ""}
+            ${isCode ? "font-mono" : ""}
+            ${className}
           `}
           disabled={disabled}
           placeholder={placeholder}
           autoComplete={autoCompleteDisabled ? "off" : undefined}
         />
+        {includeForgotPassword && (
+          <Link
+            href="/auth/forgot-password"
+            className="absolute right-3 top-1/2 mt-[3px] transform -translate-y-1/2 text-xs text-blue-500 cursor-pointer"
+          >
+            Forgot password?
+          </Link>
+        )}
       </div>
 
       {explanationText && (
@@ -344,24 +414,24 @@ export const MarkdownFormField = ({
   return (
     <div className="flex flex-col space-y-4 mb-4">
       <Label>{label}</Label>
-      <div className="border border-gray-300 rounded-md">
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-100 rounded-t-md">
+      <div className="border border-background-300 rounded-md">
+        <div className="flex items-center justify-between px-4 py-2 bg-background-100 rounded-t-md">
           <div className="flex items-center space-x-2">
-            <FaMarkdown className="text-gray-500" />
-            <span className="text-sm font-semibold text-gray-600">
+            <FaMarkdown className="text-text-500" />
+            <span className="text-sm font-semibold text-text-600">
               Markdown
             </span>
           </div>
           <button
             type="button"
             onClick={togglePreview}
-            className="text-sm font-semibold text-gray-600 hover:text-gray-800 focus:outline-none"
+            className="text-sm font-semibold text-text-600 hover:text-text-800 focus:outline-none"
           >
             {isPreviewOpen ? "Write" : "Preview"}
           </button>
         </div>
         {isPreviewOpen ? (
-          <div className="p-4 border-t border-gray-300">
+          <div className="p-4 border-t border-background-300">
             <ReactMarkdown className="prose" remarkPlugins={[remarkGfm]}>
               {field.value}
             </ReactMarkdown>
@@ -372,7 +442,7 @@ export const MarkdownFormField = ({
               {...field}
               rows={2}
               placeholder={placeholder}
-              className={`w-full p-2 border border-border rounded-md border-gray-300`}
+              className={`w-full p-2 border border-border rounded-md border-background-300`}
             />
           </div>
         )}
@@ -394,53 +464,67 @@ interface BooleanFormFieldProps {
   name: string;
   label: string;
   subtext?: string | JSX.Element;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   removeIndent?: boolean;
   small?: boolean;
-  alignTop?: boolean;
   noLabel?: boolean;
   disabled?: boolean;
-  checked?: boolean;
   optional?: boolean;
   tooltip?: string;
+  disabledTooltip?: string;
+  onChange?: (checked: boolean) => void;
 }
 
 export const BooleanFormField = ({
   name,
   label,
   subtext,
-  onChange,
   removeIndent,
   noLabel,
   optional,
   small,
   disabled,
-  alignTop,
-  checked,
   tooltip,
+  disabledTooltip,
+  onChange,
 }: BooleanFormFieldProps) => {
-  const [field, meta, helpers] = useField<boolean>(name);
-  const { setValue } = helpers;
+  const { setFieldValue } = useFormikContext<any>();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValue(e.target.checked);
-    if (onChange) {
-      onChange(e);
-    }
-  };
+  const handleChange = useCallback(
+    (checked: CheckedState) => {
+      if (!disabled) {
+        setFieldValue(name, checked);
+      }
+      if (onChange) {
+        onChange(checked === true);
+      }
+    },
+    [disabled, name, setFieldValue, onChange]
+  );
 
   return (
     <div>
-      <label className="flex text-sm">
-        <Field
-          type="checkbox"
-          {...field}
-          checked={checked !== undefined ? checked : field.value}
-          disabled={disabled}
-          onChange={handleChange}
-          className={`${removeIndent ? "mr-2" : "mx-3"}     
-              px-5 w-3.5 h-3.5 ${alignTop ? "mt-1" : "my-auto"}`}
-        />
+      <label className="flex items-center text-sm cursor-pointer">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <CheckboxField
+                name={name}
+                size="sm"
+                className={`
+                  ${disabled ? "opacity-50" : ""}
+                  ${removeIndent ? "mr-2" : "mx-3"}`}
+                onCheckedChange={handleChange}
+              />
+            </TooltipTrigger>
+            {disabled && disabledTooltip && (
+              <TooltipContent side="top" align="center">
+                <p className="bg-background-900 max-w-[200px] mb-1 text-sm rounded-lg p-1.5 text-white">
+                  {disabledTooltip}
+                </p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
         {!noLabel && (
           <div>
             <div className="flex items-center gap-x-2">
@@ -449,6 +533,7 @@ export const BooleanFormField = ({
               }`}</Label>
               {tooltip && <ToolTipDetails>{tooltip}</ToolTipDetails>}
             </div>
+
             {subtext && <SubLabel>{subtext}</SubLabel>}
           </div>
         )}
@@ -522,7 +607,7 @@ export function TextArrayField<T extends Yup.AnyObject>({
                     <div className="my-auto">
                       {index >= minFields ? (
                         <FiX
-                          className="my-auto w-10 h-10 cursor-pointer hover:bg-hover rounded p-2"
+                          className="my-auto w-10 h-10 cursor-pointer hover:bg-accent-background-hovered rounded p-2"
                           onClick={() => arrayHelpers.remove(index)}
                         />
                       ) : (
@@ -585,6 +670,9 @@ interface SelectorFormFieldProps {
   onSelect?: (selected: string | number | null) => void;
   defaultValue?: string;
   tooltip?: string;
+  includeReset?: boolean;
+  fontSize?: "sm" | "md" | "lg";
+  small?: boolean;
 }
 
 export function SelectorFormField({
@@ -597,6 +685,9 @@ export function SelectorFormField({
   onSelect,
   defaultValue,
   tooltip,
+  includeReset = false,
+  fontSize = "sm",
+  small = false,
 }: SelectorFormFieldProps) {
   const [field] = useField<string>(name);
   const { setFieldValue } = useFormikContext();
@@ -606,11 +697,33 @@ export function SelectorFormField({
     (option) => option.value?.toString() === field.value?.toString()
   );
 
+  const textSizeClasses = {
+    sm: {
+      label: "text-sm",
+      input: "text-sm",
+      placeholder: "text-sm",
+    },
+    md: {
+      label: "text-base",
+      input: "text-base",
+      placeholder: "text-base",
+    },
+    lg: {
+      label: "text-lg",
+      input: "text-lg",
+      placeholder: "text-lg",
+    },
+  };
+
+  const sizeClass = textSizeClasses[fontSize];
+
   return (
     <div>
       {label && (
         <div className="flex gap-x-2 items-center">
-          <Label>{label}</Label>
+          <Label className={sizeClass.label} small={small}>
+            {label}
+          </Label>
           {tooltip && <ToolTipDetails>{tooltip}</ToolTipDetails>}
         </div>
       )}
@@ -619,11 +732,15 @@ export function SelectorFormField({
         <Select
           value={field.value || defaultValue}
           onValueChange={
-            onSelect || ((selected) => setFieldValue(name, selected))
+            onSelect ||
+            ((selected) =>
+              selected == "__none__"
+                ? setFieldValue(name, null)
+                : setFieldValue(name, selected))
           }
           defaultValue={defaultValue}
         >
-          <SelectTrigger>
+          <SelectTrigger className={sizeClass.input}>
             <SelectValue placeholder="Select...">
               {currentlySelected?.name || defaultValue || ""}
             </SelectValue>
@@ -632,7 +749,11 @@ export function SelectorFormField({
           {container && (
             <SelectContent
               side={side}
-              className={maxHeight ? `max-h-[${maxHeight}]` : undefined}
+              className={`
+               ${maxHeight ? `${maxHeight}` : "max-h-72"}
+               overflow-y-scroll
+               ${sizeClass.input}
+              `}
               container={container}
             >
               {options.length === 0 ? (
@@ -640,6 +761,7 @@ export function SelectorFormField({
               ) : (
                 options.map((option) => (
                   <SelectItem
+                    hideCheck
                     icon={option.icon}
                     key={option.value}
                     value={String(option.value)}
@@ -648,6 +770,14 @@ export function SelectorFormField({
                     {option.name}
                   </SelectItem>
                 ))
+              )}
+              {includeReset && (
+                <SelectItem
+                  value={"__none__"}
+                  onSelect={() => setFieldValue(name, null)}
+                >
+                  None
+                </SelectItem>
               )}
             </SelectContent>
           )}

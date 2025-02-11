@@ -28,7 +28,7 @@ If there is no relevant information, just say "No relevant information found."
 """
 
 
-def wait_on_run(client: OpenAI, run, thread):
+def wait_on_run(client: OpenAI, run, thread):  # type: ignore
     while run.status == "queued" or run.status == "in_progress":
         run = client.beta.threads.runs.retrieve(
             thread_id=thread.id,
@@ -38,7 +38,7 @@ def wait_on_run(client: OpenAI, run, thread):
     return run
 
 
-def show_response(messages) -> None:
+def show_response(messages) -> None:  # type: ignore
     # Get only the assistant's response text
     for message in messages.data[::-1]:
         if message.role == "assistant":
@@ -52,14 +52,14 @@ def analyze_topics(topics: list[str]) -> None:
     openai_api_key = os.environ.get(
         "OPENAI_API_KEY", "<your OpenAI API key if not set as env var>"
     )
-    danswer_api_key = os.environ.get(
-        "DANSWER_API_KEY", "<your Danswer API key if not set as env var>"
+    onyx_api_key = os.environ.get(
+        "DANSWER_API_KEY", "<your Onyx API key if not set as env var>"
     )
     client = OpenAI(
         api_key=openai_api_key,
         base_url="http://localhost:8080/openai-assistants",
         default_headers={
-            "Authorization": f"Bearer {danswer_api_key}",
+            "Authorization": f"Bearer {onyx_api_key}",
         },
     )
 

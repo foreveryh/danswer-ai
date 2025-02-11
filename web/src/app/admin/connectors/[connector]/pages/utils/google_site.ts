@@ -2,6 +2,7 @@ import { PopupSpec } from "@/components/admin/connectors/Popup";
 import { createConnector, runConnector } from "@/lib/connector";
 import { linkCredential } from "@/lib/credential";
 import { GoogleSitesConfig } from "@/lib/connectors/connectors";
+import { ValidSources } from "@/lib/types";
 
 export const submitGoogleSite = async (
   selectedFiles: File[],
@@ -10,7 +11,7 @@ export const submitGoogleSite = async (
   refreshFreq: number,
   pruneFreq: number,
   indexingStart: Date,
-  is_public: boolean,
+  access_type: string,
   groups: number[],
   name?: string
 ) => {
@@ -38,13 +39,13 @@ export const submitGoogleSite = async (
     const [connectorErrorMsg, connector] =
       await createConnector<GoogleSitesConfig>({
         name: name ? name : `GoogleSitesConnector-${base_url}`,
-        source: "google_sites",
+        source: ValidSources.GoogleSites,
         input_type: "load_state",
         connector_specific_config: {
           base_url: base_url,
           zip_path: filePaths[0],
         },
-        is_public: is_public,
+        access_type: access_type,
         refresh_freq: refreshFreq,
         prune_freq: pruneFreq,
         indexing_start: indexingStart,

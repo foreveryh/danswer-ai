@@ -2,13 +2,13 @@ import { PopupSpec } from "@/components/admin/connectors/Popup";
 import { createConnector, runConnector } from "@/lib/connector";
 import { createCredential, linkCredential } from "@/lib/credential";
 import { FileConfig } from "@/lib/connectors/connectors";
+import { AccessType, ValidSources } from "@/lib/types";
 
 export const submitFiles = async (
   selectedFiles: File[],
   setPopup: (popup: PopupSpec) => void,
-  setSelectedFiles: (files: File[]) => void,
   name: string,
-  isPublic: boolean,
+  access_type: string,
   groups?: number[]
 ) => {
   const formData = new FormData();
@@ -34,7 +34,7 @@ export const submitFiles = async (
 
   const [connectorErrorMsg, connector] = await createConnector<FileConfig>({
     name: "FileConnector-" + Date.now(),
-    source: "file",
+    source: ValidSources.File,
     input_type: "load_state",
     connector_specific_config: {
       file_locations: filePaths,
@@ -42,7 +42,7 @@ export const submitFiles = async (
     refresh_freq: null,
     prune_freq: null,
     indexing_start: null,
-    is_public: isPublic,
+    access_type: access_type,
     groups: groups,
   });
   if (connectorErrorMsg || !connector) {
@@ -60,8 +60,8 @@ export const submitFiles = async (
   const createCredentialResponse = await createCredential({
     credential_json: {},
     admin_public: true,
-    source: "file",
-    curator_public: isPublic,
+    source: ValidSources.File,
+    curator_public: true,
     groups: groups,
     name,
   });
@@ -80,7 +80,7 @@ export const submitFiles = async (
     connector.id,
     credentialId,
     name,
-    isPublic ? "public" : "private",
+    access_type as AccessType,
     groups
   );
   if (!credentialResponse.ok) {
@@ -101,7 +101,6 @@ export const submitFiles = async (
     return false;
   }
 
-  setSelectedFiles([]);
   setPopup({
     type: "success",
     message: "Successfully uploaded files!",

@@ -6,8 +6,19 @@ import { Separator } from "@/components/ui/separator";
 import { FiUsers } from "react-icons/fi";
 import { UserGroup, UserRole } from "@/lib/types";
 import { useUserGroups } from "@/lib/hooks";
-import { AccessType } from "@/lib/types";
+import {
+  AccessType,
+  ValidAutoSyncSource,
+  ConfigurableSources,
+  validAutoSyncSources,
+} from "@/lib/types";
 import { useUser } from "@/components/user/UserProvider";
+
+function isValidAutoSyncSource(
+  value: ConfigurableSources
+): value is ValidAutoSyncSource {
+  return validAutoSyncSources.includes(value as ValidAutoSyncSource);
+}
 
 // This should be included for all forms that require groups / public access
 // to be set, and access to this / permissioning should be handled within this component itself.
@@ -17,11 +28,16 @@ export type AccessTypeGroupSelectorFormType = {
   groups: number[];
 };
 
-export function AccessTypeGroupSelector({}: {}) {
+export function AccessTypeGroupSelector({
+  connector,
+}: {
+  connector: ConfigurableSources;
+}) {
   const { data: userGroups, isLoading: userGroupsIsLoading } = useUserGroups();
-  const { isAdmin, user, isLoadingUser, isCurator } = useUser();
+  const { isAdmin, user, isCurator } = useUser();
   const isPaidEnterpriseFeaturesEnabled = usePaidEnterpriseFeaturesEnabled();
   const [shouldHideContent, setShouldHideContent] = useState(false);
+  const isAutoSyncSupported = isValidAutoSyncSource(connector);
 
   const [access_type, meta, access_type_helpers] =
     useField<AccessType>("access_type");
@@ -34,13 +50,18 @@ export function AccessTypeGroupSelector({}: {}) {
         access_type_helpers.setValue("public");
         return;
       }
-      if (!isUserAdmin) {
+      if (!isUserAdmin && !isAutoSyncSupported) {
         access_type_helpers.setValue("private");
       }
-      if (userGroups.length === 1 && !isUserAdmin) {
+      if (
+        access_type.value === "private" &&
+        userGroups.length === 1 &&
+        !isUserAdmin
+      ) {
         groups_helpers.setValue([userGroups[0].id]);
         setShouldHideContent(true);
       } else if (access_type.value !== "private") {
+        // If the access type is public or sync, empty the groups selection
         groups_helpers.setValue([]);
         setShouldHideContent(false);
       } else {
@@ -56,7 +77,7 @@ export function AccessTypeGroupSelector({}: {}) {
     isPaidEnterpriseFeaturesEnabled,
   ]);
 
-  if (isLoadingUser || userGroupsIsLoading) {
+  if (userGroupsIsLoading) {
     return <div>Loading...</div>;
   }
   if (!isPaidEnterpriseFeaturesEnabled) {
@@ -89,7 +110,7 @@ export function AccessTypeGroupSelector({}: {}) {
               </div>
             </div>
             {userGroupsIsLoading ? (
-              <div className="animate-pulse bg-gray-200 h-8 w-32 rounded"></div>
+              <div className="animate-pulse bg-background-200 h-8 w-32 rounded"></div>
             ) : (
               <Text className="mb-3">
                 {isAdmin ? (
@@ -110,7 +131,7 @@ export function AccessTypeGroupSelector({}: {}) {
               render={(arrayHelpers: ArrayHelpers) => (
                 <div className="flex gap-2 flex-wrap mb-4">
                   {userGroupsIsLoading ? (
-                    <div className="animate-pulse bg-gray-200 h-8 w-32 rounded"></div>
+                    <div className="animate-pulse bg-background-200 h-8 w-32 rounded"></div>
                   ) : (
                     userGroups &&
                     userGroups.map((userGroup: UserGroup) => {
@@ -131,7 +152,7 @@ export function AccessTypeGroupSelector({}: {}) {
                             ${
                               isSelected
                                 ? "bg-background-strong"
-                                : "hover:bg-hover"
+                                : "hover:bg-accent-background-hovered"
                             }
                         `}
                           onClick={() => {

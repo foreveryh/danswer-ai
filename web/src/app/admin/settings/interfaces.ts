@@ -5,14 +5,14 @@ export enum GatingType {
 }
 
 export interface Settings {
-  chat_page_enabled: boolean;
-  search_page_enabled: boolean;
-  default_page: "search" | "chat";
+  anonymous_user_enabled: boolean;
   maximum_chat_retention_days: number | null;
   notifications: Notification[];
   needs_reindexing: boolean;
   gpu_enabled: boolean;
+  pro_search_disabled: boolean | null;
   product_gating: GatingType;
+  auto_scroll: boolean;
 }
 
 export enum NotificationType {
@@ -54,6 +54,7 @@ export interface EnterpriseSettings {
   custom_popup_header: string | null;
   custom_popup_content: string | null;
   enable_consent_screen: boolean | null;
+  auto_scroll: boolean;
 }
 
 export interface CombinedSettings {
@@ -62,4 +63,5 @@ export interface CombinedSettings {
   customAnalyticsScript: string | null;
   isMobile?: boolean;
   webVersion: string | null;
+  webDomain: string | null;
 }

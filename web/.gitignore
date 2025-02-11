@@ -34,3 +34,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright testing temp files
+/admin_auth.json
+/user_auth.json
+/build-archive.log
+/test-results

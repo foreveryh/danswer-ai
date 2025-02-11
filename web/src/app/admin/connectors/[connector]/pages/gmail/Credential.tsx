@@ -34,9 +34,9 @@ const DriveJsonUpload = ({
     <>
       <input
         className={
-          "mr-3 text-sm text-gray-900 border border-gray-300 overflow-visible " +
-          "cursor-pointer bg-background dark:text-gray-400 focus:outline-none " +
-          "dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
+          "mr-3 text-sm text-text-900 border border-background-300 overflow-visible " +
+          "cursor-pointer bg-background dark:text-text-400 focus:outline-none " +
+          "dark:bg-background-700 dark:border-background-600 dark:placeholder-text-400"
         }
         type="file"
         accept=".json"
@@ -271,7 +271,7 @@ export const GmailJsonUploadSection = ({
         <a
           className="text-link"
           target="_blank"
-          href="https://docs.danswer.dev/connectors/gmail#authorization"
+          href="https://docs.onyx.app/connectors/gmail#authorization"
           rel="noreferrer"
         >
           here
@@ -317,14 +317,14 @@ export const GmailAuthSection = ({
     return (
       <>
         <p className="mb-2 text-sm">
-          <i>Existing credential already setup!</i>
+          <i>Existing credential already set up!</i>
         </p>
         <Button
           onClick={async () => {
             if (connectorExists) {
               setPopup({
                 message:
-                  "Cannot revoke access to Gmail while any connector is still setup. Please delete all connectors, then try again.",
+                  "Cannot revoke access to Gmail while any connector is still set up. Please delete all connectors, then try again.",
                 type: "error",
               });
               return;

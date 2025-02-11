@@ -1,34 +1,28 @@
 "use client";
 
-import { generateRandomIconShape, createSVG } from "@/lib/assistantIconUtils";
-
-import { CCPairBasicInfo, DocumentSet, User } from "@/lib/types";
+import React from "react";
+import { Option } from "@/components/Dropdown";
+import { generateRandomIconShape } from "@/lib/assistantIconUtils";
+import { CCPairBasicInfo, DocumentSet, User, UserGroup } from "@/lib/types";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { IsPublicGroupSelector } from "@/components/IsPublicGroupSelector";
-import {
-  ArrayHelpers,
-  ErrorMessage,
-  Field,
-  FieldArray,
-  Form,
-  Formik,
-  FormikProps,
-} from "formik";
+import { ArrayHelpers, FieldArray, Form, Formik, FormikProps } from "formik";
 
 import {
   BooleanFormField,
   Label,
-  SelectorFormField,
   TextFormField,
 } from "@/components/admin/connectors/Field";
+
 import { usePopup } from "@/components/admin/connectors/Popup";
-import { getDisplayNameForModel } from "@/lib/hooks";
+import { getDisplayNameForModel, useLabels } from "@/lib/hooks";
 import { DocumentSetSelectable } from "@/components/documentSet/DocumentSetSelectable";
-import { Option } from "@/components/Dropdown";
 import { addAssistantToList } from "@/lib/assistants/updateAssistantPreferences";
-import { checkLLMSupportsImageInput, destructureValue } from "@/lib/llm/utils";
+import {
+  checkLLMSupportsImageInput,
+  destructureValue,
+  structureValue,
+} from "@/lib/llm/utils";
 import { ToolSnapshot } from "@/lib/tools/interfaces";
 import { checkUserIsNoAuthUser } from "@/lib/user";
 
@@ -40,28 +34,53 @@ import {
 } from "@/components/ui/tooltip";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { FiInfo, FiX } from "react-icons/fi";
+import { useEffect, useMemo, useState } from "react";
+import { FiInfo } from "react-icons/fi";
 import * as Yup from "yup";
-import { FullLLMProvider } from "../configuration/llm/interfaces";
 import CollapsibleSection from "./CollapsibleSection";
 import { SuccessfulPersonaUpdateRedirectType } from "./enums";
-import { Persona, StarterMessage } from "./interfaces";
-import { createPersona, updatePersona } from "./lib";
-import { Popover } from "@/components/popover/Popover";
+import { Persona, PersonaLabel, StarterMessage } from "./interfaces";
+import {
+  PersonaUpsertParameters,
+  createPersona,
+  updatePersona,
+  deletePersona,
+} from "./lib";
 import {
   CameraIcon,
+  GroupsIconSkeleton,
   NewChatIcon,
   SwapIcon,
   TrashIcon,
 } from "@/components/icons/icons";
-import { AdvancedOptionsToggle } from "@/components/AdvancedOptionsToggle";
 import { buildImgUrl } from "@/app/chat/files/images/utils";
-import { LlmList } from "@/components/llm/LLMList";
 import { useAssistants } from "@/components/context/AssistantsContext";
+import { debounce } from "lodash";
+import { FullLLMProvider } from "../configuration/llm/interfaces";
+import StarterMessagesList from "./StarterMessageList";
+
+import { Switch, SwitchField } from "@/components/ui/switch";
+import { generateIdenticon } from "@/components/assistants/AssistantIcon";
+import { BackButton } from "@/components/BackButton";
+import { Checkbox, CheckboxField } from "@/components/ui/checkbox";
+import { AdvancedOptionsToggle } from "@/components/AdvancedOptionsToggle";
+import { MinimalUserSnapshot } from "@/lib/types";
+import { useUserGroups } from "@/lib/hooks";
+import {
+  SearchMultiSelectDropdown,
+  Option as DropdownOption,
+} from "@/components/Dropdown";
+import { SourceChip } from "@/app/chat/input/ChatInputBar";
+import { TagIcon, UserIcon, XIcon } from "lucide-react";
+import { LLMSelector } from "@/components/llm/LLMSelector";
+import useSWR from "swr";
+import { errorHandlingFetcher } from "@/lib/fetcher";
+import { DeleteEntityModal } from "@/components/modals/DeleteEntityModal";
+import Title from "@/components/ui/title";
+import { SEARCH_TOOL_ID } from "@/app/chat/tools/constants";
 
 function findSearchTool(tools: ToolSnapshot[]) {
-  return tools.find((tool) => tool.in_code_tool_id === "SearchTool");
+  return tools.find((tool) => tool.in_code_tool_id === SEARCH_TOOL_ID);
 }
 
 function findImageGenerationTool(tools: ToolSnapshot[]) {
@@ -74,7 +93,10 @@ function findInternetSearchTool(tools: ToolSnapshot[]) {
 
 function SubLabel({ children }: { children: string | JSX.Element }) {
   return (
-    <div className="text-sm text-description font-description mb-2">
+    <div
+      className="text-sm text-description font-description mb-2"
+      style={{ color: "rgb(113, 114, 121)" }}
+    >
       {children}
     </div>
   );
@@ -107,6 +129,8 @@ export function AssistantEditor({
   const router = useRouter();
 
   const { popup, setPopup } = usePopup();
+  const { labels, refreshLabels, createLabel, updateLabel, deleteLabel } =
+    useLabels();
 
   const colorOptions = [
     "#FF6FBF",
@@ -124,6 +148,7 @@ export function AssistantEditor({
   const [defautIconColor, _setDeafultIconColor] = useState(
     colorOptions[Math.floor(Math.random() * colorOptions.length)]
   );
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [defaultIconShape, setDefaultIconShape] = useState<any>(null);
 
@@ -137,6 +162,10 @@ export function AssistantEditor({
 
   const [removePersonaImage, setRemovePersonaImage] = useState(false);
 
+  const autoStarterMessageEnabled = useMemo(
+    () => llmProviders.length > 0,
+    [llmProviders.length]
+  );
   const isUpdate = existingPersona !== undefined && existingPersona !== null;
   const existingPrompt = existingPersona?.prompts[0] ?? null;
   const defaultProvider = llmProviders.find(
@@ -190,6 +219,7 @@ export function AssistantEditor({
   const initialValues = {
     name: existingPersona?.name ?? "",
     description: existingPersona?.description ?? "",
+    datetime_aware: existingPrompt?.datetime_aware ?? false,
     system_prompt: existingPrompt?.system_prompt ?? "",
     task_prompt: existingPrompt?.task_prompt ?? "",
     is_public: existingPersona?.is_public ?? defaultPublic,
@@ -206,20 +236,175 @@ export function AssistantEditor({
       existingPersona?.llm_model_provider_override ?? null,
     llm_model_version_override:
       existingPersona?.llm_model_version_override ?? null,
-    starter_messages: existingPersona?.starter_messages ?? [],
+    starter_messages: existingPersona?.starter_messages?.length
+      ? existingPersona.starter_messages
+      : [{ message: "" }],
     enabled_tools_map: enabledToolsMap,
     icon_color: existingPersona?.icon_color ?? defautIconColor,
     icon_shape: existingPersona?.icon_shape ?? defaultIconShape,
     uploaded_image: null,
+    labels: existingPersona?.labels ?? null,
 
     // EE Only
-    groups: existingPersona?.groups ?? [],
+    label_ids: existingPersona?.labels?.map((label) => label.id) ?? [],
+    selectedUsers:
+      existingPersona?.users?.filter(
+        (u) => u.id !== existingPersona.owner?.id
+      ) ?? [],
+    selectedGroups: existingPersona?.groups ?? [],
   };
 
+  interface AssistantPrompt {
+    message: string;
+    name: string;
+  }
+
+  const debouncedRefreshPrompts = debounce(
+    async (formValues: any, setFieldValue: any) => {
+      if (!autoStarterMessageEnabled) {
+        return;
+      }
+      setIsRefreshing(true);
+      try {
+        const response = await fetch("/api/persona/assistant-prompt-refresh", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: formValues.name || "",
+            description: formValues.description || "",
+            document_set_ids: formValues.document_set_ids || [],
+            instructions:
+              formValues.system_prompt || formValues.task_prompt || "",
+            generation_count:
+              4 -
+              formValues.starter_messages.filter(
+                (message: StarterMessage) => message.message.trim() !== ""
+              ).length,
+          }),
+        });
+
+        const data: AssistantPrompt[] = await response.json();
+        if (response.ok) {
+          const filteredStarterMessages = formValues.starter_messages.filter(
+            (message: StarterMessage) => message.message.trim() !== ""
+          );
+          setFieldValue("starter_messages", [
+            ...filteredStarterMessages,
+            ...data,
+          ]);
+        }
+      } catch (error) {
+        console.error("Failed to refresh prompts:", error);
+      } finally {
+        setIsRefreshing(false);
+      }
+    },
+    1000
+  );
+
+  const [labelToDelete, setLabelToDelete] = useState<PersonaLabel | null>(null);
   const [isRequestSuccessful, setIsRequestSuccessful] = useState(false);
 
+  const { data: userGroups } = useUserGroups();
+  // const { data: allUsers } = useUsers({ includeApiKeys: false }) as {
+  //   data: MinimalUserSnapshot[] | undefined;
+  // };
+
+  const { data: users } = useSWR<MinimalUserSnapshot[]>(
+    "/api/users",
+    errorHandlingFetcher
+  );
+
+  const mapUsersToMinimalSnapshot = (users: any): MinimalUserSnapshot[] => {
+    if (!users || !Array.isArray(users.users)) return [];
+    return users.users.map((user: any) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    }));
+  };
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  if (!labels) {
+    return <></>;
+  }
+
+  const openDeleteModal = () => {
+    setDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false);
+  };
+
+  const handleDeletePersona = async () => {
+    if (existingPersona) {
+      const response = await deletePersona(existingPersona.id);
+      if (response.ok) {
+        await refreshAssistants();
+        router.push(
+          redirectType === SuccessfulPersonaUpdateRedirectType.ADMIN
+            ? `/admin/assistants?u=${Date.now()}`
+            : `/chat`
+        );
+      } else {
+        setPopup({
+          type: "error",
+          message: `Failed to delete persona - ${await response.text()}`,
+        });
+      }
+    }
+  };
+
   return (
-    <div>
+    <div className="mx-auto max-w-4xl">
+      <style>
+        {`
+          .assistant-editor input::placeholder,
+          .assistant-editor textarea::placeholder {
+            opacity: 0.5;
+          }
+        `}
+      </style>
+      {!admin && (
+        <div className="absolute top-4 left-4">
+          <BackButton />
+        </div>
+      )}
+      {labelToDelete && (
+        <DeleteEntityModal
+          entityType="label"
+          entityName={labelToDelete.name}
+          onClose={() => setLabelToDelete(null)}
+          onSubmit={async () => {
+            const response = await deleteLabel(labelToDelete.id);
+            if (response?.ok) {
+              setPopup({
+                message: `Label deleted successfully`,
+                type: "success",
+              });
+              await refreshLabels();
+            } else {
+              setPopup({
+                message: `Failed to delete label - ${await response.text()}`,
+                type: "error",
+              });
+            }
+            setLabelToDelete(null);
+          }}
+        />
+      )}
+      {deleteModalOpen && existingPersona && (
+        <DeleteEntityModal
+          entityType="Persona"
+          entityName={existingPersona.name}
+          onClose={closeDeleteModal}
+          onSubmit={handleDeletePersona}
+        />
+      )}
       {popup}
       <Formik
         enableReinitialize={true}
@@ -243,12 +428,7 @@ export function AssistantEditor({
             llm_model_provider_override: Yup.string().nullable(),
             starter_messages: Yup.array().of(
               Yup.object().shape({
-                name: Yup.string().required(
-                  "Each starter message must have a name"
-                ),
-                message: Yup.string().required(
-                  "Each starter message must have a message"
-                ),
+                message: Yup.string(),
               })
             ),
             search_start_date: Yup.date().nullable(),
@@ -256,7 +436,9 @@ export function AssistantEditor({
             icon_shape: Yup.number(),
             uploaded_image: Yup.mixed().nullable(),
             // EE Only
-            groups: Yup.array().of(Yup.number()),
+            label_ids: Yup.array().of(Yup.number()),
+            selectedUsers: Yup.array().of(Yup.object()),
+            selectedGroups: Yup.array().of(Yup.number()),
           })
           .test(
             "system-prompt-or-task-prompt",
@@ -295,70 +477,57 @@ export function AssistantEditor({
           let enabledTools = Object.keys(values.enabled_tools_map)
             .map((toolId) => Number(toolId))
             .filter((toolId) => values.enabled_tools_map[toolId]);
+
           const searchToolEnabled = searchTool
             ? enabledTools.includes(searchTool.id)
             : false;
-          const imageGenerationToolEnabled = imageGenerationTool
-            ? enabledTools.includes(imageGenerationTool.id)
-            : false;
-
-          if (imageGenerationToolEnabled) {
-            if (
-              // model must support image input for image generation
-              // to work
-              !checkLLMSupportsImageInput(
-                values.llm_model_version_override || defaultModelName || ""
-              )
-            ) {
-              enabledTools = enabledTools.filter(
-                (toolId) => toolId !== imageGenerationTool!.id
-              );
-            }
-          }
 
           // if disable_retrieval is set, set num_chunks to 0
           // to tell the backend to not fetch any documents
           const numChunks = searchToolEnabled ? values.num_chunks || 10 : 0;
+          const starterMessages = values.starter_messages
+            .filter(
+              (message: { message: string }) => message.message.trim() !== ""
+            )
+            .map((message: { message: string; name?: string }) => ({
+              message: message.message,
+              name: message.name || message.message,
+            }));
 
           // don't set groups if marked as public
-          const groups = values.is_public ? [] : values.groups;
+          const groups = values.is_public ? [] : values.selectedGroups;
+          const submissionData: PersonaUpsertParameters = {
+            ...values,
+            existing_prompt_id: existingPrompt?.id ?? null,
+            is_default_persona: admin!,
+            starter_messages: starterMessages,
+            groups: groups,
+            users: values.is_public
+              ? undefined
+              : [
+                  ...(user && !checkUserIsNoAuthUser(user.id) ? [user.id] : []),
+                  ...values.selectedUsers.map((u: MinimalUserSnapshot) => u.id),
+                ],
+            tool_ids: enabledTools,
+            remove_image: removePersonaImage,
+            search_start_date: values.search_start_date
+              ? new Date(values.search_start_date)
+              : null,
+            num_chunks: numChunks,
+          };
 
-          let promptResponse;
           let personaResponse;
           if (isUpdate) {
-            [promptResponse, personaResponse] = await updatePersona({
-              id: existingPersona.id,
-              existingPromptId: existingPrompt?.id,
-              ...values,
-              search_start_date: values.search_start_date
-                ? new Date(values.search_start_date)
-                : null,
-              num_chunks: numChunks,
-              users:
-                user && !checkUserIsNoAuthUser(user.id) ? [user.id] : undefined,
-              groups,
-              tool_ids: enabledTools,
-              remove_image: removePersonaImage,
-            });
+            personaResponse = await updatePersona(
+              existingPersona.id,
+              submissionData
+            );
           } else {
-            [promptResponse, personaResponse] = await createPersona({
-              ...values,
-              is_default_persona: admin!,
-              num_chunks: numChunks,
-              search_start_date: values.search_start_date
-                ? new Date(values.search_start_date)
-                : null,
-              users:
-                user && !checkUserIsNoAuthUser(user.id) ? [user.id] : undefined,
-              groups,
-              tool_ids: enabledTools,
-            });
+            personaResponse = await createPersona(submissionData);
           }
 
           let error = null;
-          if (!promptResponse.ok) {
-            error = await promptResponse.text();
-          }
+
           if (!personaResponse) {
             error = "Failed to create Assistant - no response received";
           } else if (!personaResponse.ok) {
@@ -384,7 +553,7 @@ export function AssistantEditor({
                   message: `"${assistant.name}" has been added to your list.`,
                   type: "success",
                 });
-                router.refresh();
+                await refreshAssistants();
               } else {
                 setPopup({
                   message: `"${assistant.name}" could not be added to your list.`,
@@ -392,6 +561,7 @@ export function AssistantEditor({
                 });
               }
             }
+
             await refreshAssistants();
             router.push(
               redirectType === SuccessfulPersonaUpdateRedirectType.ADMIN
@@ -406,6 +576,7 @@ export function AssistantEditor({
           isSubmitting,
           values,
           setFieldValue,
+          errors,
           ...formikProps
         }: FormikProps<any>) => {
           function toggleToolInValues(toolId: number) {
@@ -416,12 +587,6 @@ export function AssistantEditor({
             setFieldValue("enabled_tools_map", updatedEnabledToolsMap);
           }
 
-          function searchToolEnabled() {
-            return searchTool && values.enabled_tools_map[searchTool.id]
-              ? true
-              : false;
-          }
-
           // model must support image input for image generation
           // to work
           const currentLLMSupportsImageOutput = checkLLMSupportsImageInput(
@@ -429,715 +594,791 @@ export function AssistantEditor({
           );
 
           return (
-            <Form className="w-full text-text-950">
-              <div className="w-full flex gap-x-2 justify-center">
-                <Popover
-                  open={isIconDropdownOpen}
-                  onOpenChange={setIsIconDropdownOpen}
-                  content={
-                    <div
-                      className="p-1 cursor-pointer border-dashed rounded-full flex border border-border border-2 border-dashed"
-                      style={{
-                        borderStyle: "dashed",
-                        borderWidth: "1.5px",
-                        borderSpacing: "4px",
+            <Form className="w-full text-text-950 assistant-editor">
+              {/* Refresh starter messages when name or description changes */}
+              <p className="text-base font-normal text-2xl">
+                {existingPersona ? (
+                  <>
+                    Edit assistant <b>{existingPersona.name}</b>
+                  </>
+                ) : (
+                  "Create an Assistant"
+                )}
+              </p>
+              <div className="max-w-4xl w-full">
+                <Separator />
+                <div className="flex gap-x-2 items-center">
+                  <div className="block font-medium text-sm">
+                    Assistant Icon
+                  </div>
+                </div>
+                <SubLabel>
+                  The icon that will visually represent your Assistant
+                </SubLabel>
+                <div className="flex gap-x-2 items-center">
+                  <div
+                    className="p-4 cursor-pointer  rounded-full flex  "
+                    style={{
+                      borderStyle: "dashed",
+                      borderWidth: "1.5px",
+                      borderSpacing: "4px",
+                    }}
+                  >
+                    {values.uploaded_image ? (
+                      <img
+                        src={URL.createObjectURL(values.uploaded_image)}
+                        alt="Uploaded assistant icon"
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : existingPersona?.uploaded_image_id &&
+                      !removePersonaImage ? (
+                      <img
+                        src={buildImgUrl(existingPersona?.uploaded_image_id)}
+                        alt="Uploaded assistant icon"
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      generateIdenticon((values.icon_shape || 0).toString(), 36)
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs flex justify-start gap-x-2"
+                      onClick={() => {
+                        const fileInput = document.createElement("input");
+                        fileInput.type = "file";
+                        fileInput.accept = "image/*";
+                        fileInput.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement)
+                            .files?.[0];
+                          if (file) {
+                            setFieldValue("uploaded_image", file);
+                          }
+                        };
+                        fileInput.click();
                       }}
-                      onClick={() => setIsIconDropdownOpen(!isIconDropdownOpen)}
                     >
-                      {values.uploaded_image ? (
-                        <img
-                          src={URL.createObjectURL(values.uploaded_image)}
-                          alt="Uploaded assistant icon"
-                          className="w-12 h-12 rounded-full object-cover"
-                        />
-                      ) : existingPersona?.uploaded_image_id &&
-                        !removePersonaImage ? (
-                        <img
-                          src={buildImgUrl(existingPersona?.uploaded_image_id)}
-                          alt="Uploaded assistant icon"
-                          className="w-12 h-12 rounded-full object-cover"
-                        />
-                      ) : (
-                        createSVG(
-                          {
-                            encodedGrid: values.icon_shape,
-                            filledSquares: 0,
-                          },
-                          values.icon_color,
-                          undefined,
-                          true
-                        )
-                      )}
-                    </div>
-                  }
-                  popover={
-                    <div className="bg-white text-text-800 flex flex-col gap-y-1 w-[300px] border border-border rounded-lg shadow-lg p-2">
-                      <label className="block w-full flex gap-x-2 text-left items-center px-4 py-2 hover:bg-background-100 rounded cursor-pointer">
-                        <CameraIcon />
-                        Upload {values.uploaded_image && " New "} Photo
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              setFieldValue("uploaded_image", file);
-                              setIsIconDropdownOpen(false);
-                            }
-                          }}
-                        />
-                      </label>
+                      <CameraIcon size={14} />
+                      Upload {values.uploaded_image && "New "}Image
+                    </Button>
 
-                      {values.uploaded_image && (
-                        <button
-                          onClick={() => {
-                            setFieldValue("uploaded_image", null);
-                            setRemovePersonaImage(false);
+                    {values.uploaded_image && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex justify-start gap-x-2 text-xs"
+                        onClick={() => {
+                          setFieldValue("uploaded_image", null);
+                          setRemovePersonaImage(false);
+                        }}
+                      >
+                        <TrashIcon className="h-3 w-3" />
+                        {removePersonaImage ? "Revert to Previous " : "Remove "}
+                        Image
+                      </Button>
+                    )}
+
+                    {!values.uploaded_image &&
+                      (!existingPersona?.uploaded_image_id ||
+                        removePersonaImage) && (
+                        <Button
+                          type="button"
+                          className="text-xs"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const newShape = generateRandomIconShape();
+                            const randomColor =
+                              colorOptions[
+                                Math.floor(Math.random() * colorOptions.length)
+                              ];
+                            setFieldValue("icon_shape", newShape.encodedGrid);
+                            setFieldValue("icon_color", randomColor);
                           }}
-                          className="block w-full items-center flex gap-x-2 text-left px-4 py-2 hover:bg-background-100 rounded"
                         >
-                          <TrashIcon />
-                          {removePersonaImage
-                            ? "Revert to Previous "
-                            : "Remove "}
-                          Image
-                        </button>
+                          <NewChatIcon size={14} />
+                          Generate Icon
+                        </Button>
                       )}
 
-                      {!values.uploaded_image &&
-                        (!existingPersona?.uploaded_image_id ||
-                          removePersonaImage) && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const newShape = generateRandomIconShape();
-                              const randomColor =
-                                colorOptions[
-                                  Math.floor(
-                                    Math.random() * colorOptions.length
-                                  )
-                                ];
-                              setFieldValue("icon_shape", newShape.encodedGrid);
-                              setFieldValue("icon_color", randomColor);
-                            }}
-                            className="block w-full items-center flex gap-x-2 text-left px-4 py-2 hover:bg-background-100 rounded"
-                          >
-                            <NewChatIcon />
-                            Generate New Icon
-                          </button>
-                        )}
+                    {existingPersona?.uploaded_image_id &&
+                      removePersonaImage &&
+                      !values.uploaded_image && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="text-xs"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRemovePersonaImage(false);
+                            setFieldValue("uploaded_image", null);
+                          }}
+                        >
+                          <SwapIcon className="h-3 w-3" />
+                          Revert to Previous Image
+                        </Button>
+                      )}
 
-                      {existingPersona?.uploaded_image_id &&
-                        removePersonaImage &&
-                        !values.uploaded_image && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRemovePersonaImage(false);
-                              setFieldValue("uploaded_image", null);
-                            }}
-                            className="block w-full items-center flex gap-x-2 text-left px-4 py-2 hover:bg-background-100 rounded"
-                          >
-                            <SwapIcon />
-                            Revert to Previous Image
-                          </button>
-                        )}
-
-                      {existingPersona?.uploaded_image_id &&
-                        !removePersonaImage &&
-                        !values.uploaded_image && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRemovePersonaImage(true);
-                            }}
-                            className="block w-full items-center flex gap-x-2 text-left px-4 py-2 hover:bg-background-100 rounded"
-                          >
-                            <TrashIcon />
-                            Remove Image
-                          </button>
-                        )}
-                    </div>
-                  }
-                  align="start"
-                  side="bottom"
-                />
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <FiInfo size={12} />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" align="center">
-                      This icon will visually represent your Assistant
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                    {existingPersona?.uploaded_image_id &&
+                      !removePersonaImage &&
+                      !values.uploaded_image && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="text-xs"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRemovePersonaImage(true);
+                          }}
+                        >
+                          <TrashIcon className="h-3 w-3" />
+                          Remove Image
+                        </Button>
+                      )}
+                  </div>
+                </div>
               </div>
 
               <TextFormField
+                maxWidth="max-w-lg"
                 name="name"
-                tooltip="Used to identify the Assistant in the UI."
                 label="Name"
-                placeholder="e.g. 'Email Assistant'"
+                placeholder="Email Assistant"
+                aria-label="assistant-name-input"
+                className="[&_input]:placeholder:text-text-muted/50"
               />
 
               <TextFormField
-                tooltip="Used for identifying assistants and their use cases."
+                maxWidth="max-w-lg"
                 name="description"
                 label="Description"
-                placeholder="e.g. 'Use this Assistant to help draft professional emails'"
+                placeholder="Use this Assistant to help draft professional emails"
+                className="[&_input]:placeholder:text-text-muted/50"
               />
 
+              <Separator />
+
               <TextFormField
-                tooltip="Gives your assistant a prime directive"
+                maxWidth="max-w-4xl"
                 name="system_prompt"
                 label="Instructions"
                 isTextArea={true}
-                placeholder="e.g. 'You are a professional email writing assistant that always uses a polite enthusiastic tone, emphasizes action items, and leaves blanks for the human to fill in when you have unknowns'"
-                onChange={(e) => {
-                  setFieldValue("system_prompt", e.target.value);
-                }}
+                placeholder="You are a professional email writing assistant that always uses a polite enthusiastic tone, emphasizes action items, and leaves blanks for the human to fill in when you have unknowns"
+                data-testid="assistant-instructions-input"
+                className="[&_textarea]:placeholder:text-text-muted/50"
               />
 
-              <div>
-                <div className="flex gap-x-2 items-center">
-                  <div className="block  font-medium text-base">
-                    Default AI Model{" "}
-                  </div>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <FiInfo size={12} />
-                      </TooltipTrigger>
-                      <TooltipContent side="top" align="center">
-                        Select a Large Language Model (Generative AI model) to
-                        power this Assistant
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <p className="my-1 font-description text-base text-text-400">
-                  Your assistant will use the user&apos;s set default unless
-                  otherwise specified below.
-                  {admin &&
-                    user?.preferences.default_model &&
-                    `  Your current (user-specific) default model is ${getDisplayNameForModel(
-                      destructureValue(user?.preferences?.default_model!)
-                        .modelName
-                    )}`}
-                </p>
-                {admin ? (
-                  <div className="mb-2 flex items-starts">
-                    <div className="w-96">
-                      <SelectorFormField
-                        defaultValue={`User default`}
-                        name="llm_model_provider_override"
-                        options={llmProviders.map((llmProvider) => ({
-                          name: llmProvider.name,
-                          value: llmProvider.name,
-                          icon: llmProvider.icon,
-                        }))}
-                        includeDefault={true}
-                        onSelect={(selected) => {
-                          if (selected !== values.llm_model_provider_override) {
-                            setFieldValue("llm_model_version_override", null);
-                          }
-                          setFieldValue(
-                            "llm_model_provider_override",
-                            selected
-                          );
-                        }}
-                      />
-                    </div>
-
-                    {values.llm_model_provider_override && (
-                      <div className="w-96 ml-4">
-                        <SelectorFormField
-                          name="llm_model_version_override"
-                          options={
-                            modelOptionsByProvider.get(
-                              values.llm_model_provider_override
-                            ) || []
-                          }
-                          maxHeight="max-h-72"
-                        />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="max-w-sm">
-                    <LlmList
-                      scrollable
-                      userDefault={
-                        user?.preferences?.default_model!
-                          ? destructureValue(user?.preferences?.default_model!)
-                              .modelName
-                          : null
-                      }
-                      llmProviders={llmProviders}
-                      currentLlm={values.llm_model_version_override}
-                      onSelect={(value: string | null) => {
-                        if (value !== null) {
-                          const { modelName, provider, name } =
-                            destructureValue(value);
-                          setFieldValue(
-                            "llm_model_version_override",
-                            modelName
-                          );
-                          setFieldValue("llm_model_provider_override", name);
-                        } else {
-                          setFieldValue("llm_model_version_override", null);
-                          setFieldValue("llm_model_provider_override", null);
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-              <div>
-                <div className="flex gap-x-2 items-center">
-                  <div className="block font-medium text-base">
-                    Capabilities{" "}
-                  </div>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <FiInfo size={12} />
-                      </TooltipTrigger>
-                      <TooltipContent side="top" align="center">
-                        You can give your assistant advanced capabilities like
-                        image generation
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  <div className="block text-sm font-description text-subtle">
-                    Advanced
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-col gap-y-4  ml-1">
-                  {imageGenerationTool && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div
-                            className={`w-fit ${
-                              !currentLLMSupportsImageOutput ||
-                              !isImageGenerationAvailable
-                                ? "opacity-70 cursor-not-allowed"
-                                : ""
-                            }`}
-                          >
-                            <BooleanFormField
-                              removeIndent
-                              name={`enabled_tools_map.${imageGenerationTool.id}`}
-                              label="Image Generation Tool"
-                              onChange={() => {
-                                toggleToolInValues(imageGenerationTool.id);
-                              }}
-                              disabled={
-                                !currentLLMSupportsImageOutput ||
-                                !isImageGenerationAvailable
-                              }
-                            />
-                          </div>
-                        </TooltipTrigger>
-                        {!currentLLMSupportsImageOutput ? (
-                          <TooltipContent side="top" align="center">
-                            <p className="bg-background-900 max-w-[200px] mb-1 text-sm rounded-lg p-1.5 text-white">
-                              To use Image Generation, select GPT-4o or another
-                              image compatible model as the default model for
-                              this Assistant.
-                            </p>
-                          </TooltipContent>
-                        ) : (
-                          !isImageGenerationAvailable && (
-                            <TooltipContent side="top" align="center">
-                              <p className="bg-background-900 max-w-[200px] mb-1 text-sm rounded-lg p-1.5 text-white">
-                                Image Generation requires an OpenAI or Azure
-                                Dalle configuration.
-                              </p>
-                            </TooltipContent>
-                          )
-                        )}
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-
+              <div className="w-full max-w-4xl">
+                <div className="flex flex-col">
                   {searchTool && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div
-                            className={`w-fit ${
-                              ccPairs.length === 0
-                                ? "opacity-70 cursor-not-allowed"
-                                : ""
-                            }`}
-                          >
-                            <BooleanFormField
-                              name={`enabled_tools_map.${searchTool.id}`}
-                              label="Search Tool"
-                              removeIndent
-                              onChange={() => {
-                                setFieldValue("num_chunks", null);
-                                toggleToolInValues(searchTool.id);
-                              }}
-                              disabled={ccPairs.length === 0}
-                            />
-                          </div>
-                        </TooltipTrigger>
-                        {ccPairs.length === 0 && (
-                          <TooltipContent side="top" align="center">
-                            <p className="bg-background-900 max-w-[200px] mb-1 text-sm rounded-lg p-1.5 text-white">
-                              To use the Search Tool, you need to have at least
-                              one Connector-Credential pair configured.
-                            </p>
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-
-                  {ccPairs.length > 0 && searchTool && (
                     <>
-                      {searchToolEnabled() && (
-                        <CollapsibleSection prompt="Configure Search">
-                          <div>
-                            {ccPairs.length > 0 && (
-                              <>
-                                <Label small>Document Sets</Label>
-                                <div>
-                                  <SubLabel>
-                                    <>
-                                      Select which{" "}
-                                      {!user || user.role === "admin" ? (
-                                        <Link
-                                          href="/admin/documents/sets"
-                                          className="text-blue-500"
-                                          target="_blank"
-                                        >
-                                          Document Sets
-                                        </Link>
-                                      ) : (
-                                        "Document Sets"
-                                      )}{" "}
-                                      this Assistant should search through. If
-                                      none are specified, the Assistant will
-                                      search through all available documents in
-                                      order to try and respond to queries.
-                                    </>
-                                  </SubLabel>
-                                </div>
+                      <Separator />
+                      <div className="flex gap-x-2 py-2 flex justify-start">
+                        <div>
+                          <div
+                            className="flex items-start gap-x-2
+                          "
+                          >
+                            <p className="block font-medium text-sm">
+                              Knowledge
+                            </p>
+                            <div className="flex items-center">
+                              <TooltipProvider delayDuration={0}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div
+                                      className={`${
+                                        ccPairs.length === 0
+                                          ? "opacity-70 cursor-not-allowed"
+                                          : ""
+                                      }`}
+                                    >
+                                      <SwitchField
+                                        size="sm"
+                                        onCheckedChange={(checked) => {
+                                          setFieldValue("num_chunks", null);
+                                          toggleToolInValues(searchTool.id);
+                                        }}
+                                        name={`enabled_tools_map.${searchTool.id}`}
+                                        disabled={ccPairs.length === 0}
+                                      />
+                                    </div>
+                                  </TooltipTrigger>
 
-                                {documentSets.length > 0 ? (
-                                  <FieldArray
-                                    name="document_set_ids"
-                                    render={(arrayHelpers: ArrayHelpers) => (
-                                      <div>
-                                        <div className="mb-3 mt-2 flex gap-2 flex-wrap text-sm">
-                                          {documentSets.map((documentSet) => {
-                                            const ind =
-                                              values.document_set_ids.indexOf(
-                                                documentSet.id
-                                              );
-                                            const isSelected = ind !== -1;
-                                            return (
-                                              <DocumentSetSelectable
-                                                key={documentSet.id}
-                                                documentSet={documentSet}
-                                                isSelected={isSelected}
-                                                onSelect={() => {
-                                                  if (isSelected) {
-                                                    arrayHelpers.remove(ind);
-                                                  } else {
-                                                    arrayHelpers.push(
-                                                      documentSet.id
-                                                    );
-                                                  }
-                                                }}
-                                              />
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    )}
-                                  />
-                                ) : (
-                                  <p className="text-sm italic">
-                                    No Document Sets available.{" "}
-                                    {user?.role !== "admin" && (
-                                      <>
-                                        If this functionality would be useful,
-                                        reach out to the administrators of
-                                        Danswer for assistance.
-                                      </>
-                                    )}
-                                  </p>
-                                )}
-
-                                <div className="mt-4  flex flex-col gap-y-4">
-                                  <TextFormField
-                                    small={true}
-                                    name="num_chunks"
-                                    label="Number of Context Documents"
-                                    tooltip="How many of the top matching document sections to feed the LLM for context when generating a response"
-                                    placeholder="Defaults to 10"
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      if (
-                                        value === "" ||
-                                        /^[0-9]+$/.test(value)
-                                      ) {
-                                        setFieldValue("num_chunks", value);
-                                      }
-                                    }}
-                                  />
-
-                                  <TextFormField
-                                    width="max-w-xl"
-                                    type="date"
-                                    small
-                                    subtext="Documents prior to this date will not be referenced by the search tool"
-                                    optional
-                                    label="Search Start Date"
-                                    value={values.search_start_date}
-                                    name="search_start_date"
-                                  />
-
-                                  <BooleanFormField
-                                    small
-                                    removeIndent
-                                    alignTop
-                                    name="llm_relevance_filter"
-                                    label="Apply LLM Relevance Filter"
-                                    subtext={
-                                      "If enabled, the LLM will filter out chunks that are not relevant to the user query."
-                                    }
-                                  />
-
-                                  <BooleanFormField
-                                    small
-                                    removeIndent
-                                    alignTop
-                                    name="include_citations"
-                                    label="Include Citations"
-                                    subtext={`
-                                      If set, the response will include bracket citations ([1], [2], etc.) 
-                                      for each document used by the LLM to help inform the response. This is 
-                                      the same technique used by the default Assistants. In general, we recommend 
-                                      to leave this enabled in order to increase trust in the LLM answer.`}
-                                  />
-                                </div>
-                              </>
-                            )}
+                                  {ccPairs.length === 0 && (
+                                    <TooltipContent side="top" align="center">
+                                      <p className="bg-background-900 max-w-[200px] text-sm rounded-lg p-1.5 text-white">
+                                        To use the Knowledge Action, you need to
+                                        have at least one Connector configured.
+                                      </p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
                           </div>
-                        </CollapsibleSection>
-                      )}
+                          <p className="text-sm text-neutral-700 dark:text-neutral-400">
+                            Attach additional unique knowledge to this assistant
+                          </p>
+                        </div>
+                      </div>
                     </>
                   )}
+                  {ccPairs.length > 0 &&
+                    searchTool &&
+                    values.enabled_tools_map[searchTool.id] &&
+                    !(user?.role != "admin" && documentSets.length === 0) && (
+                      <CollapsibleSection>
+                        <div className="mt-2">
+                          {ccPairs.length > 0 && (
+                            <>
+                              <Label small>Document Sets</Label>
+                              <div>
+                                <SubLabel>
+                                  <>
+                                    Select which{" "}
+                                    {!user || user.role === "admin" ? (
+                                      <Link
+                                        href="/admin/documents/sets"
+                                        className="font-semibold underline hover:underline text-text"
+                                        target="_blank"
+                                      >
+                                        Document Sets
+                                      </Link>
+                                    ) : (
+                                      "Document Sets"
+                                    )}{" "}
+                                    this Assistant should use to inform its
+                                    responses. If none are specified, the
+                                    Assistant will reference all available
+                                    documents.
+                                  </>
+                                </SubLabel>
+                              </div>
 
-                  {internetSearchTool && (
-                    <BooleanFormField
-                      removeIndent
-                      name={`enabled_tools_map.${internetSearchTool.id}`}
-                      label={internetSearchTool.display_name}
-                      onChange={() => {
-                        toggleToolInValues(internetSearchTool.id);
-                      }}
-                    />
-                  )}
+                              {documentSets.length > 0 ? (
+                                <FieldArray
+                                  name="document_set_ids"
+                                  render={(arrayHelpers: ArrayHelpers) => (
+                                    <div>
+                                      <div className="mb-3 mt-2 flex gap-2 flex-wrap text-sm">
+                                        {documentSets.map((documentSet) => (
+                                          <DocumentSetSelectable
+                                            key={documentSet.id}
+                                            documentSet={documentSet}
+                                            isSelected={values.document_set_ids.includes(
+                                              documentSet.id
+                                            )}
+                                            onSelect={() => {
+                                              const index =
+                                                values.document_set_ids.indexOf(
+                                                  documentSet.id
+                                                );
+                                              if (index !== -1) {
+                                                arrayHelpers.remove(index);
+                                              } else {
+                                                arrayHelpers.push(
+                                                  documentSet.id
+                                                );
+                                              }
+                                            }}
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                />
+                              ) : (
+                                <p className="text-sm">
+                                  <Link
+                                    href="/admin/documents/sets/new"
+                                    className="text-primary hover:underline"
+                                  >
+                                    + Create Document Set
+                                  </Link>
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </CollapsibleSection>
+                    )}
 
-                  {customTools.length > 0 && (
-                    <>
-                      {customTools.map((tool) => (
+                  <Separator />
+                  <div className="py-2">
+                    <p className="block font-medium text-sm mb-2">Actions</p>
+
+                    {imageGenerationTool && (
+                      <>
+                        <div className="flex items-center content-start mb-2">
+                          <BooleanFormField
+                            name={`enabled_tools_map.${imageGenerationTool.id}`}
+                            label={imageGenerationTool.display_name}
+                            subtext="Generate and manipulate images using AI-powered tools"
+                            disabled={
+                              !currentLLMSupportsImageOutput ||
+                              !isImageGenerationAvailable
+                            }
+                            disabledTooltip={
+                              !currentLLMSupportsImageOutput
+                                ? "To use Image Generation, select GPT-4 or another image compatible model as the default model for this Assistant."
+                                : "Image Generation requires an OpenAI or Azure Dall-E configuration."
+                            }
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {internetSearchTool && (
+                      <>
                         <BooleanFormField
-                          removeIndent
-                          alignTop={tool.description != null}
+                          name={`enabled_tools_map.${internetSearchTool.id}`}
+                          label={internetSearchTool.display_name}
+                          subtext="Access real-time information and search the web for up-to-date results"
+                        />
+                      </>
+                    )}
+
+                    {customTools.length > 0 &&
+                      customTools.map((tool) => (
+                        <BooleanFormField
                           key={tool.id}
                           name={`enabled_tools_map.${tool.id}`}
                           label={tool.display_name}
                           subtext={tool.description}
-                          onChange={() => {
-                            toggleToolInValues(tool.id);
-                          }}
                         />
                       ))}
-                    </>
-                  )}
+                  </div>
                 </div>
               </div>
+              <Separator className="max-w-4xl mt-0" />
+
+              <div className="-mt-2">
+                <div className="flex gap-x-2 mb-2 items-center">
+                  <div className="block font-medium text-sm">Default Model</div>
+                </div>
+                <LLMSelector
+                  llmProviders={llmProviders}
+                  currentLlm={
+                    values.llm_model_version_override
+                      ? structureValue(
+                          values.llm_model_provider_override,
+                          "",
+                          values.llm_model_version_override
+                        )
+                      : null
+                  }
+                  requiresImageGeneration={
+                    imageGenerationTool
+                      ? values.enabled_tools_map[imageGenerationTool.id]
+                      : false
+                  }
+                  onSelect={(selected) => {
+                    if (selected === null) {
+                      setFieldValue("llm_model_version_override", null);
+                      setFieldValue("llm_model_provider_override", null);
+                    } else {
+                      const { modelName, provider, name } =
+                        destructureValue(selected);
+                      if (modelName && name) {
+                        setFieldValue("llm_model_version_override", modelName);
+                        setFieldValue("llm_model_provider_override", name);
+                      }
+                    }
+                  }}
+                />
+              </div>
+
               <Separator />
               <AdvancedOptionsToggle
                 showAdvancedOptions={showAdvancedOptions}
                 setShowAdvancedOptions={setShowAdvancedOptions}
               />
-
               {showAdvancedOptions && (
                 <>
-                  {llmProviders.length > 0 && (
-                    <>
-                      <TextFormField
-                        name="task_prompt"
-                        label="Reminders (Optional)"
-                        isTextArea={true}
-                        placeholder="e.g. 'Remember to reference all of the points mentioned in my message to you and focus on identifying action items that can move things forward'"
-                        onChange={(e) => {
-                          setFieldValue("task_prompt", e.target.value);
-                        }}
-                        explanationText="Learn about prompting in our docs!"
-                        explanationLink="https://docs.danswer.dev/guides/assistants"
-                      />
-                    </>
-                  )}
-
-                  <div className="mb-6 flex flex-col">
-                    <div className="flex gap-x-2 items-center">
-                      <div className="block font-medium text-base">
-                        Starter Messages (Optional){" "}
-                      </div>
+                  <div className="max-w-4xl w-full">
+                    <div className="flex gap-x-2 items-center ">
+                      <div className="block font-medium text-sm">Access</div>
                     </div>
                     <SubLabel>
-                      Add pre-defined messages to help users get started. Only
-                      the first 4 will be displayed.
+                      Control who can access and use this assistant
                     </SubLabel>
-                    <FieldArray
-                      name="starter_messages"
-                      render={(
-                        arrayHelpers: ArrayHelpers<StarterMessage[]>
-                      ) => (
-                        <div>
-                          {values.starter_messages &&
-                            values.starter_messages.length > 0 &&
-                            values.starter_messages.map(
-                              (
-                                starterMessage: StarterMessage,
-                                index: number
+
+                    <div className="min-h-[100px]">
+                      <div className="flex items-center mb-2">
+                        <SwitchField
+                          name="is_public"
+                          size="md"
+                          onCheckedChange={(checked) => {
+                            setFieldValue("is_public", checked);
+                            if (checked) {
+                              setFieldValue("selectedUsers", []);
+                              setFieldValue("selectedGroups", []);
+                            }
+                          }}
+                        />
+                        <span className="text-sm ml-2">
+                          {values.is_public ? "Public" : "Private"}
+                        </span>
+                      </div>
+
+                      {values.is_public ? (
+                        <p className="text-sm text-text-dark">
+                          Anyone from your organization can view and use this
+                          assistant
+                        </p>
+                      ) : (
+                        <>
+                          <div className="mt-2">
+                            <Label className="mb-2" small>
+                              Share with Users and Groups
+                            </Label>
+
+                            <SearchMultiSelectDropdown
+                              options={[
+                                ...(Array.isArray(users) ? users : [])
+                                  .filter(
+                                    (u: MinimalUserSnapshot) =>
+                                      !values.selectedUsers.some(
+                                        (su: MinimalUserSnapshot) =>
+                                          su.id === u.id
+                                      ) && u.id !== user?.id
+                                  )
+                                  .map((u: MinimalUserSnapshot) => ({
+                                    name: u.email,
+                                    value: u.id,
+                                    type: "user",
+                                  })),
+                                ...(userGroups || [])
+                                  .filter(
+                                    (g: UserGroup) =>
+                                      !values.selectedGroups.includes(g.id)
+                                  )
+                                  .map((g: UserGroup) => ({
+                                    name: g.name,
+                                    value: g.id,
+                                    type: "group",
+                                  })),
+                              ]}
+                              onSelect={(
+                                selected: DropdownOption<string | number>
                               ) => {
-                                return (
-                                  <div
-                                    key={index}
-                                    className={index === 0 ? "mt-2" : "mt-6"}
-                                  >
-                                    <div className="flex">
-                                      <div className="w-full mr-6 border border-border p-3 rounded">
-                                        <div>
-                                          <Label small>Name</Label>
-                                          <SubLabel>
-                                            Shows up as the &quot;title&quot;
-                                            for this Starter Message. For
-                                            example, &quot;Write an email&quot;.
-                                          </SubLabel>
-                                          <Field
-                                            name={`starter_messages[${index}].name`}
-                                            className={`
-                                            border 
-                                            border-border 
-                                            bg-background 
-                                            rounded 
-                                            w-full 
-                                            py-2 
-                                            px-3 
-                                            mr-4
-                                          `}
-                                            autoComplete="off"
-                                          />
-                                          <ErrorMessage
-                                            name={`starter_messages[${index}].name`}
-                                            component="div"
-                                            className="text-error text-sm mt-1"
-                                          />
-                                        </div>
-
-                                        <div className="mt-3">
-                                          <Label small>Message</Label>
-                                          <SubLabel>
-                                            The actual message to be sent as the
-                                            initial user message if a user
-                                            selects this starter prompt. For
-                                            example, &quot;Write me an email to
-                                            a client about a new billing feature
-                                            we just released.&quot;
-                                          </SubLabel>
-                                          <Field
-                                            name={`starter_messages[${index}].message`}
-                                            className={`
-                                              border 
-                                              border-border 
-                                              bg-background 
-                                              rounded 
-                                              w-full 
-                                              py-2 
-                                              px-3 
-                                              min-h-12
-                                              mr-4
-                                              line-clamp-
-                                          `}
-                                            as="textarea"
-                                            autoComplete="off"
-                                          />
-                                          <ErrorMessage
-                                            name={`starter_messages[${index}].message`}
-                                            component="div"
-                                            className="text-error text-sm mt-1"
-                                          />
-                                        </div>
-                                      </div>
-                                      <div className="my-auto">
-                                        <FiX
-                                          className="my-auto w-10 h-10 cursor-pointer hover:bg-hover rounded p-2"
-                                          onClick={() =>
-                                            arrayHelpers.remove(index)
-                                          }
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              }
+                                const option = selected as {
+                                  name: string;
+                                  value: string | number;
+                                  type: "user" | "group";
+                                };
+                                if (option.type === "user") {
+                                  setFieldValue("selectedUsers", [
+                                    ...values.selectedUsers,
+                                    { id: option.value, email: option.name },
+                                  ]);
+                                } else {
+                                  setFieldValue("selectedGroups", [
+                                    ...values.selectedGroups,
+                                    option.value,
+                                  ]);
+                                }
+                              }}
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {values.selectedUsers.map(
+                              (user: MinimalUserSnapshot) => (
+                                <SourceChip
+                                  key={user.id}
+                                  onRemove={() => {
+                                    setFieldValue(
+                                      "selectedUsers",
+                                      values.selectedUsers.filter(
+                                        (u: MinimalUserSnapshot) =>
+                                          u.id !== user.id
+                                      )
+                                    );
+                                  }}
+                                  title={user.email}
+                                  icon={<UserIcon size={12} />}
+                                />
+                              )
                             )}
-
-                          <Button
-                            onClick={() => {
-                              arrayHelpers.push({
-                                name: "",
-                                description: "",
-                                message: "",
-                              });
-                            }}
-                            className="mt-3"
-                            size="sm"
-                            variant="next"
-                          >
-                            Add New
-                          </Button>
-                        </div>
+                            {values.selectedGroups.map((groupId: number) => {
+                              const group = (userGroups || []).find(
+                                (g: UserGroup) => g.id === groupId
+                              );
+                              return group ? (
+                                <SourceChip
+                                  key={group.id}
+                                  title={group.name}
+                                  onRemove={() => {
+                                    setFieldValue(
+                                      "selectedGroups",
+                                      values.selectedGroups.filter(
+                                        (id: number) => id !== group.id
+                                      )
+                                    );
+                                  }}
+                                  icon={<GroupsIconSkeleton size={12} />}
+                                />
+                              ) : null;
+                            })}
+                          </div>
+                        </>
                       )}
-                    />
+                    </div>
                   </div>
 
-                  <IsPublicGroupSelector
-                    formikProps={{
-                      values,
-                      isSubmitting,
-                      setFieldValue,
-                      ...formikProps,
+                  <Separator />
+
+                  <div className="w-full flex flex-col">
+                    <div className="flex gap-x-2 items-center">
+                      <div className="block font-medium text-sm">
+                        [Optional] Starter Messages
+                      </div>
+                    </div>
+
+                    <SubLabel>
+                      Sample messages that help users understand what this
+                      assistant can do and how to interact with it effectively.
+                      New input fields will appear automatically as you type.
+                    </SubLabel>
+
+                    <div className="w-full">
+                      <FieldArray
+                        name="starter_messages"
+                        render={(arrayHelpers: ArrayHelpers) => (
+                          <StarterMessagesList
+                            debouncedRefreshPrompts={() =>
+                              debouncedRefreshPrompts(values, setFieldValue)
+                            }
+                            autoStarterMessageEnabled={
+                              autoStarterMessageEnabled
+                            }
+                            isRefreshing={isRefreshing}
+                            values={values.starter_messages}
+                            arrayHelpers={arrayHelpers}
+                            setFieldValue={setFieldValue}
+                          />
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className=" w-full max-w-4xl">
+                    <Separator />
+                    <div className="flex gap-x-2 items-center mt-4 ">
+                      <div className="block font-medium text-sm">Labels</div>
+                    </div>
+                    <p
+                      className="text-sm text-subtle"
+                      style={{ color: "rgb(113, 114, 121)" }}
+                    >
+                      Select labels to categorize this assistant
+                    </p>
+                    <div className="mt-3">
+                      <SearchMultiSelectDropdown
+                        onCreate={async (name: string) => {
+                          await createLabel(name);
+                          const currentLabels = await refreshLabels();
+
+                          setTimeout(() => {
+                            const newLabelId = currentLabels.find(
+                              (l: { name: string }) => l.name === name
+                            )?.id;
+                            const updatedLabelIds = [
+                              ...values.label_ids,
+                              newLabelId as number,
+                            ];
+                            setFieldValue("label_ids", updatedLabelIds);
+                          }, 300);
+                        }}
+                        options={Array.from(
+                          new Set(labels.map((label) => label.name))
+                        ).map((name) => ({
+                          name,
+                          value: name,
+                        }))}
+                        onSelect={(selected) => {
+                          const newLabelIds = [
+                            ...values.label_ids,
+                            labels.find((l) => l.name === selected.value)
+                              ?.id as number,
+                          ];
+                          setFieldValue("label_ids", newLabelIds);
+                        }}
+                        itemComponent={({ option }) => (
+                          <div className="flex items-center justify-between px-4 py-3 text-sm hover:bg-accent-background-hovered cursor-pointer border-b border-border last:border-b-0">
+                            <div
+                              className="flex-grow"
+                              onClick={() => {
+                                const label = labels.find(
+                                  (l) => l.name === option.value
+                                );
+                                if (label) {
+                                  const isSelected = values.label_ids.includes(
+                                    label.id
+                                  );
+                                  const newLabelIds = isSelected
+                                    ? values.label_ids.filter(
+                                        (id: number) => id !== label.id
+                                      )
+                                    : [...values.label_ids, label.id];
+                                  setFieldValue("label_ids", newLabelIds);
+                                }
+                              }}
+                            >
+                              <span className="font-normal leading-none">
+                                {option.name}
+                              </span>
+                            </div>
+                            {admin && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const label = labels.find(
+                                    (l) => l.name === option.value
+                                  );
+                                  if (label) {
+                                    deleteLabel(label.id);
+                                  }
+                                }}
+                                className="ml-2 p-1 hover:bg-background-hover rounded"
+                              >
+                                <TrashIcon size={16} />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      />
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {values.label_ids.map((labelId: number) => {
+                          const label = labels.find((l) => l.id === labelId);
+                          return label ? (
+                            <SourceChip
+                              key={label.id}
+                              onRemove={() => {
+                                setFieldValue(
+                                  "label_ids",
+                                  values.label_ids.filter(
+                                    (id: number) => id !== label.id
+                                  )
+                                );
+                              }}
+                              title={label.name}
+                              icon={<TagIcon size={12} />}
+                            />
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <Separator />
+
+                  <div className="flex flex-col gap-y-4">
+                    <div className="flex flex-col gap-y-4">
+                      <h3 className="font-medium text-sm">Knowledge Options</h3>
+                      <div className="flex flex-col gap-y-4 ml-4">
+                        <TextFormField
+                          small={true}
+                          name="num_chunks"
+                          label="[Optional] Number of Context Documents"
+                          placeholder="Default 10"
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === "" || /^[0-9]+$/.test(value)) {
+                              setFieldValue("num_chunks", value);
+                            }
+                          }}
+                        />
+
+                        <TextFormField
+                          width="max-w-xl"
+                          type="date"
+                          small
+                          subtext="Documents prior to this date will be ignored."
+                          label="[Optional] Knowledge Cutoff Date"
+                          name="search_start_date"
+                        />
+
+                        <BooleanFormField
+                          small
+                          removeIndent
+                          name="llm_relevance_filter"
+                          label="AI Relevance Filter"
+                          subtext="If enabled, the LLM will filter out documents that are not useful for answering the user query prior to generating a response. This typically improves the quality of the response but incurs slightly higher cost."
+                        />
+
+                        <BooleanFormField
+                          small
+                          removeIndent
+                          name="include_citations"
+                          label="Citations"
+                          subtext="Response will include citations ([1], [2], etc.) for documents referenced by the LLM. In general, we recommend to leave this enabled in order to increase trust in the LLM answer."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <Separator />
+
+                  <BooleanFormField
+                    small
+                    removeIndent
+                    name="datetime_aware"
+                    label="Date and Time Aware"
+                    subtext='Toggle this option to let the assistant know the current date and time (formatted like: "Thursday Jan 1, 1970 00:01"). To inject it in a specific place in the prompt, use the pattern [[CURRENT_DATETIME]]'
+                  />
+
+                  <Separator />
+
+                  <TextFormField
+                    maxWidth="max-w-4xl"
+                    name="task_prompt"
+                    label="[Optional] Reminders"
+                    isTextArea={true}
+                    placeholder="Remember to reference all of the points mentioned in my message to you and focus on identifying action items that can move things forward"
+                    onChange={(e) => {
+                      setFieldValue("task_prompt", e.target.value);
                     }}
-                    objectName="assistant"
-                    enforceGroupSelection={false}
+                    explanationText="Learn about prompting in our docs!"
+                    explanationLink="https://docs.onyx.app/guides/assistants"
+                    className="[&_textarea]:placeholder:text-text-muted/50"
                   />
                 </>
               )}
 
-              <div className="flex">
+              <div className="mt-12 gap-x-2 w-full justify-end flex">
                 <Button
-                  variant="submit"
                   type="submit"
                   disabled={isSubmitting || isRequestSuccessful}
                 >
-                  {isUpdate ? "Update!" : "Create!"}
+                  {isUpdate ? "Update" : "Create"}
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.back()}
+                >
+                  Cancel
+                </Button>
+              </div>
+
+              <div className="flex justify-end">
+                {existingPersona && (
+                  <Button
+                    variant="destructive"
+                    onClick={openDeleteModal}
+                    type="button"
+                  >
+                    Delete
+                  </Button>
+                )}
               </div>
             </Form>
           );

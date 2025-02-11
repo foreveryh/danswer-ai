@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { ValidSources } from "@/lib/types";
 import { FaAccusoft } from "react-icons/fa";
 import { submitCredential } from "@/components/admin/connectors/CredentialForm";
@@ -15,8 +14,6 @@ import {
   credentialTemplates,
   getDisplayNameForCredentialKey,
 } from "@/lib/connectors/credentials";
-import { getCurrentUser } from "@/lib/user";
-import { User, UserRole } from "@/lib/types";
 import { PlusCircleIcon } from "../../icons/icons";
 import { GmailMain } from "@/app/admin/connectors/[connector]/pages/gmail/GmailPage";
 import { ActionType, dictionaryType } from "../types";
@@ -43,15 +40,12 @@ const CreateButton = ({
 }) => (
   <div className="flex justify-end w-full">
     <Button
-      className="enabled:cursor-pointer disabled:cursor-not-allowed disabled:bg-blue-200 bg-blue-400 flex gap-x-1 items-center text-white py-2.5 px-3.5 text-sm font-regular rounded-sm"
       onClick={onClick}
       type="button"
       disabled={isSubmitting || (!isAdmin && groups.length === 0)}
     >
-      <div className="flex items-center gap-x-1">
-        <PlusCircleIcon size={16} className="text-indigo-100" />
-        Create
-      </div>
+      <PlusCircleIcon className="h-4 w-4" />
+      Create
     </Button>
   </div>
 );
@@ -97,10 +91,7 @@ export default function CreateCredential({
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const isPaidEnterpriseFeaturesEnabled = usePaidEnterpriseFeaturesEnabled();
 
-  const { isLoadingUser, isAdmin } = useUser();
-  if (isLoadingUser) {
-    return <></>;
-  }
+  const { isAdmin } = useUser();
 
   const handleSubmit = async (
     values: formType,

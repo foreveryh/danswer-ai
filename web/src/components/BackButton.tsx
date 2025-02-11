@@ -6,8 +6,10 @@ import { FiChevronLeft } from "react-icons/fi";
 
 export function BackButton({
   behaviorOverride,
+  routerOverride,
 }: {
   behaviorOverride?: () => void;
+  routerOverride?: string;
 }) {
   const router = useRouter();
 
@@ -17,7 +19,7 @@ export function BackButton({
         my-auto 
         flex 
         mb-1 
-        hover:bg-hover-light 
+        hover:bg-accent-background 
         w-fit 
         p-1
         pr-2 
@@ -27,6 +29,8 @@ export function BackButton({
       onClick={() => {
         if (behaviorOverride) {
           behaviorOverride();
+        } else if (routerOverride) {
+          router.push(routerOverride);
         } else {
           router.back();
         }

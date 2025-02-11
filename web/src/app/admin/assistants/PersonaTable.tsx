@@ -17,6 +17,7 @@ import { FiEdit2 } from "react-icons/fi";
 import { TrashIcon } from "@/components/icons/icons";
 import { useUser } from "@/components/user/UserProvider";
 import { useAssistants } from "@/components/context/AssistantsContext";
+import { DeleteEntityModal } from "@/components/modals/DeleteEntityModal";
 
 function PersonaTypeDisplay({ persona }: { persona: Persona }) {
   if (persona.builtin_persona) {
@@ -41,7 +42,7 @@ function PersonaTypeDisplay({ persona }: { persona: Persona }) {
 export function PersonasTable() {
   const router = useRouter();
   const { popup, setPopup } = usePopup();
-  const { refreshUser, isLoadingUser, isAdmin } = useUser();
+  const { refreshUser, isAdmin } = useUser();
   const {
     allAssistants: assistants,
     refreshAssistants,
@@ -53,6 +54,8 @@ export function PersonasTable() {
   }, [editablePersonas]);
 
   const [finalPersonas, setFinalPersonas] = useState<Persona[]>([]);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [personaToDelete, setPersonaToDelete] = useState<Persona | null>(null);
 
   useEffect(() => {
     const editable = editablePersonas.sort(personaComparator);
@@ -90,7 +93,7 @@ export function PersonasTable() {
         message: `Failed to update persona order - ${await response.text()}`,
       });
       setFinalPersonas(assistants);
-      router.refresh();
+      await refreshAssistants();
       return;
     }
 
@@ -98,19 +101,42 @@ export function PersonasTable() {
     await refreshUser();
   };
 
-  if (isLoadingUser) {
-    return <></>;
-  }
+  const openDeleteModal = (persona: Persona) => {
+    setPersonaToDelete(persona);
+    setDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setPersonaToDelete(null);
+  };
+
+  const handleDeletePersona = async () => {
+    if (personaToDelete) {
+      const response = await deletePersona(personaToDelete.id);
+      if (response.ok) {
+        await refreshAssistants();
+        closeDeleteModal();
+      } else {
+        setPopup({
+          type: "error",
+          message: `Failed to delete persona - ${await response.text()}`,
+        });
+      }
+    }
+  };
 
   return (
     <div>
       {popup}
-
-      <Text className="my-2">
-        Assistants will be displayed as options on the Chat / Search interfaces
-        in the order they are displayed below. Assistants marked as hidden will
-        not be displayed. Editable assistants are shown at the top.
-      </Text>
+      {deleteModalOpen && personaToDelete && (
+        <DeleteEntityModal
+          entityType="Persona"
+          entityName={personaToDelete.name}
+          onClose={closeDeleteModal}
+          onSubmit={handleDeletePersona}
+        />
+      )}
 
       <DraggableTable
         headers={["Name", "Description", "Type", "Is Visible", "Delete"]}
@@ -151,7 +177,7 @@ export function PersonasTable() {
                       persona.is_visible
                     );
                     if (response.ok) {
-                      router.refresh();
+                      await refreshAssistants();
                     } else {
                       setPopup({
                         type: "error",
@@ -161,7 +187,9 @@ export function PersonasTable() {
                   }
                 }}
                 className={`px-1 py-0.5 rounded flex ${
-                  isEditable ? "hover:bg-hover cursor-pointer" : ""
+                  isEditable
+                    ? "hover:bg-accent-background-hovered cursor-pointer"
+                    : ""
                 } select-none w-fit`}
               >
                 <div className="my-auto w-12">
@@ -179,17 +207,8 @@ export function PersonasTable() {
                 <div className="mr-auto my-auto">
                   {!persona.builtin_persona && isEditable ? (
                     <div
-                      className="hover:bg-hover rounded p-1 cursor-pointer"
-                      onClick={async () => {
-                        const response = await deletePersona(persona.id);
-                        if (response.ok) {
-                          router.refresh();
-                        } else {
-                          alert(
-                            `Failed to delete persona - ${await response.text()}`
-                          );
-                        }
-                      }}
+                      className="hover:bg-accent-background-hovered rounded p-1 cursor-pointer"
+                      onClick={() => openDeleteModal(persona)}
                     >
                       <TrashIcon />
                     </div>

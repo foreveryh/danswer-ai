@@ -1,10 +1,10 @@
-import { ConnectorIndexingStatus } from "@/lib/types";
+import { ConnectorIndexingStatus, ConnectorStatus } from "@/lib/types";
 import { ConnectorTitle } from "@/components/admin/connectors/ConnectorTitle";
 
 interface ConnectorEditorProps {
   selectedCCPairIds: number[];
   setSetCCPairIds: (ccPairId: number[]) => void;
-  allCCPairs: ConnectorIndexingStatus<any, any>[];
+  allCCPairs: ConnectorStatus<any, any>[];
 }
 
 export const ConnectorEditor = ({
@@ -33,7 +33,9 @@ export const ConnectorEditor = ({
           w-fit 
           flex 
           cursor-pointer ` +
-                (isSelected ? " bg-hover" : " hover:bg-hover-light")
+                (isSelected
+                  ? " bg-accent-background-hovered"
+                  : " hover:bg-accent-background")
               }
               onClick={() => {
                 if (isSelected) {

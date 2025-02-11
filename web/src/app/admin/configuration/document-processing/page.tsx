@@ -62,9 +62,8 @@ function Main() {
         <div className="space-y-4">
           <p className="text-text-600">
             Unstructured extracts and transforms complex data from formats like
-            .pdf, .docx, .png, .pptx, etc. into clean text for Danswer to
-            ingest. Provide an API key to enable Unstructured document
-            processing.
+            .pdf, .docx, .png, .pptx, etc. into clean text for Onyx to ingest.
+            Provide an API key to enable Unstructured document processing.
             <br />
             <br /> <strong>Note:</strong> this will send documents to
             Unstructured servers for processing.
@@ -85,7 +84,7 @@ function Main() {
             {isApiKeySet ? (
               <div className="w-full p-3 border rounded-md bg-background text-text flex items-center">
                 <span className="flex-grow">••••••••••••••••</span>
-                <Lock className="h-5 w-5 text-gray-400" />
+                <Lock className="h-5 w-5 text-text-400" />
               </div>
             ) : (
               <input

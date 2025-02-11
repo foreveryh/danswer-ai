@@ -59,7 +59,7 @@ function SummaryRow({
   return (
     <TableRow
       onClick={onToggle}
-      className="border-border bg-white py-4 rounded-sm !border cursor-pointer"
+      className="border-border dark:hover:bg-neutral-800 dark:border-neutral-700 group hover:bg-background-settings-hover/20 bg-background-sidebar py-4 rounded-sm !border cursor-pointer"
     >
       <TableCell>
         <div className="text-xl flex items-center truncate ellipsis gap-x-2 font-semibold">
@@ -76,37 +76,26 @@ function SummaryRow({
       </TableCell>
 
       <TableCell>
-        <div className="text-sm text-gray-500">Total Connectors</div>
+        <div className="text-sm text-neutral-500 dark:text-neutral-300">
+          Total Connectors
+        </div>
         <div className="text-xl font-semibold">{summary.count}</div>
       </TableCell>
 
       <TableCell>
-        <div className="text-sm text-gray-500">Active Connectors</div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center mt-1">
-                <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
-                  <div
-                    className="bg-green-500 h-2 rounded-full"
-                    style={{ width: `${activePercentage}%` }}
-                  ></div>
-                </div>
-                <span className="text-sm font-medium whitespace-nowrap">
-                  {summary.active} ({activePercentage.toFixed(0)}%)
-                </span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              {summary.active} out of {summary.count} connectors are active
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className="text-sm text-neutral-500 dark:text-neutral-300">
+          Active Connectors
+        </div>
+        <p className="flex text-xl mx-auto font-semibold items-center text-lg mt-1">
+          {summary.active}/{summary.count}
+        </p>
       </TableCell>
 
       {isPaidEnterpriseFeaturesEnabled && (
         <TableCell>
-          <div className="text-sm text-gray-500">Public Connectors</div>
+          <div className="text-sm text-neutral-500 dark:text-neutral-300">
+            Public Connectors
+          </div>
           <p className="flex text-xl mx-auto font-semibold items-center text-lg mt-1">
             {summary.public}/{summary.count}
           </p>
@@ -114,14 +103,18 @@ function SummaryRow({
       )}
 
       <TableCell>
-        <div className="text-sm text-gray-500">Total Docs Indexed</div>
+        <div className="text-sm text-neutral-500 dark:text-neutral-300">
+          Total Docs Indexed
+        </div>
         <div className="text-xl font-semibold">
           {summary.totalDocsIndexed.toLocaleString()}
         </div>
       </TableCell>
 
       <TableCell>
-        <div className="text-sm text-gray-500">Errors</div>
+        <div className="text-sm text-neutral-500 dark:text-neutral-300">
+          Errors
+        </div>
 
         <div className="flex items-center text-lg gap-x-1 font-semibold">
           {summary.errors > 0 && <Warning className="text-error h-6 w-6" />}
@@ -178,7 +171,7 @@ function ConnectorRow({
         );
       case "not_started":
         return (
-          <Badge circle variant="purple">
+          <Badge circle variant="not_started">
             Scheduled
           </Badge>
         );
@@ -193,11 +186,13 @@ function ConnectorRow({
 
   return (
     <TableRow
-      className={`hover:bg-hover-light ${
-        invisible
-          ? "invisible !h-0 !-mb-10 !border-none"
-          : "!border !border-border"
-      }  w-full cursor-pointer relative `}
+      className={`
+border border-border dark:border-neutral-700
+        hover:bg-accent-background ${
+          invisible
+            ? "invisible !h-0 !-mb-10 !border-none"
+            : "!border border-border dark:border-neutral-700"
+        }  w-full cursor-pointer relative `}
       onClick={() => {
         router.push(`/admin/connector/${ccPairsIndexingStatus.cc_pair_id}`);
       }}
@@ -219,16 +214,13 @@ function ConnectorRow({
             </Badge>
           ) : ccPairsIndexingStatus.access_type === "sync" ? (
             <Badge
-              variant={isEditable ? "orange" : "default"}
+              variant={isEditable ? "auto-sync" : "default"}
               icon={FiRefreshCw}
             >
-              Sync
+              Auto-Sync
             </Badge>
           ) : (
-            <Badge
-              variant={isEditable ? "in_progress" : "default"}
-              icon={FiLock}
-            >
+            <Badge variant={isEditable ? "private" : "default"} icon={FiLock}>
               Private
             </Badge>
           )}
@@ -326,8 +318,9 @@ export function CCPairIndexingStatusTable({
           (sum, status) => sum + status.docs_indexed,
           0
         ),
-        errors: statuses.filter((status) => status.last_status === "failed")
-          .length,
+        errors: statuses.filter(
+          (status) => status.last_finished_status === "failed"
+        ).length,
       };
     });
 
@@ -353,13 +346,9 @@ export function CCPairIndexingStatusTable({
     );
   };
   const toggleSources = () => {
-    const currentToggledCount =
-      Object.values(connectorsToggled).filter(Boolean).length;
-    const shouldToggleOn = currentToggledCount < sortedSources.length / 2;
-
     const connectors = sortedSources.reduce(
       (acc, source) => {
-        acc[source] = shouldToggleOn;
+        acc[source] = shouldExpand;
         return acc;
       },
       {} as Record<ValidSources, boolean>
@@ -368,6 +357,7 @@ export function CCPairIndexingStatusTable({
     setConnectorsToggled(connectors);
     Cookies.set(TOGGLED_CONNECTORS_COOKIE_NAME, JSON.stringify(connectors));
   };
+
   const shouldExpand =
     Object.values(connectorsToggled).filter(Boolean).length <
     sortedSources.length;
@@ -384,7 +374,7 @@ export function CCPairIndexingStatusTable({
             last_status: "success",
             connector: {
               name: "Sample File Connector",
-              source: "file",
+              source: ValidSources.File,
               input_type: "poll",
               connector_specific_config: {
                 file_locations: ["/path/to/sample/file.txt"],
@@ -394,13 +384,14 @@ export function CCPairIndexingStatusTable({
               indexing_start: new Date("2023-07-01T12:00:00Z"),
               id: 1,
               credential_ids: [],
+              access_type: "public",
               time_created: "2023-07-01T12:00:00Z",
               time_updated: "2023-07-01T12:00:00Z",
             },
             credential: {
               id: 1,
               name: "Sample Credential",
-              source: "file",
+              source: ValidSources.File,
               user_id: "1",
               time_created: "2023-07-01T12:00:00Z",
               time_updated: "2023-07-01T12:00:00Z",
@@ -412,11 +403,6 @@ export function CCPairIndexingStatusTable({
             last_success: "2023-07-01T12:00:00Z",
             last_finished_status: "success",
             latest_index_attempt: null,
-            owner: "1",
-            error_msg: "",
-            deletion_attempt: null,
-            is_deletable: true,
-            in_progress: false,
             groups: [], // Add this line
           }}
           isEditable={false}
@@ -429,7 +415,7 @@ export function CCPairIndexingStatusTable({
           placeholder="Search connectors..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="ml-1 w-96 h-9 flex-none rounded-md bg-background-50 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="ml-1 w-96 h-9  border border-border flex-none rounded-md bg-background-50 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
 
         <Button className="h-9" onClick={() => toggleSources()}>
@@ -463,7 +449,10 @@ export function CCPairIndexingStatusTable({
                   />
                   {connectorsToggled[source] && (
                     <>
-                      <TableRow className="border border-border">
+                      <TableRow
+                        noHover
+                        className="border  !  border-border dark:border-neutral-700"
+                      >
                         <TableHead>Name</TableHead>
                         <TableHead>Last Indexed</TableHead>
                         <TableHead>Activity</TableHead>
